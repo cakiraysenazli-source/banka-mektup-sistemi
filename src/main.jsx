@@ -59,25 +59,32 @@ const onayliKayitYetkilisiUyarisi = (form) => form.status === 'Onaylandı' && !f
   ? { type: 'info', text: 'Onaylanan kayıtlarda yetkili adı soyadı eklenmesi önerilir.' } : null;
 
 function App() {
+  // Ana bileşen: form verisini, hata mesajlarını ve kayıt listesini yönetir.
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
   const [letters, setLetters] = useState([]);
   const [notice, setNotice] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // ISO tarih metninin ilk 10 karakterini (YYYY-AA-GG) alır; [] sayesinde ilk yüklemede hesaplanır.
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
-  const ruleAlerts = useMemo(() => [ // formdaki verilere bakar ve görünmesi gereken uyarıları ruleAlerts'te bir listeye koyar
+
+  // Form değiştikçe uyarıları yeniden hesaplar; filter(Boolean) null gibi boş sonuçları kaldırır.
+  const ruleAlerts = useMemo(() => [
     limitAsimiUyarisi(form.amount, form.currency),
     yuksekTutarUyarisi(form.amount, form.currency),
     kisaGecerlilikUyarisi(form),
     onayliKayitYetkilisiUyarisi(form)
-  ].filter(Boolean), [form]); 
-  const amountOverLimit = Boolean(maksimumTutariKontrolEt(form.amount, form.currency)); //input alanının rengini belirler
-  
-  useEffect(() => { //Sayfa açılınca kayıtları yükleme
-    const loadLetters = async () => { //Bu fonksiyon servisten kayıtları yükler.
-      try { //Servis kapalı olabilir, bağlantı kopabilir veya cevap geç gelebilir.
-        const response = await fetch('/api/letters', { signal: AbortSignal.timeout(8000) }); 
+  ].filter(Boolean), [form]);
+
+  // Üst limit aşılmışsa true olur ve tutar alanına kırmızı CSS sınıfı eklenmesini sağlar.
+  const amountOverLimit = Boolean(maksimumTutariKontrolEt(form.amount, form.currency));
+
+  // Sayfa ilk açıldığında servisten kayıtları yükler. Bu effect silinirse eski kayıtlar otomatik görünmez.
+  useEffect(() => {
+    const loadLetters = async () => {
+      try {
+        const response = await fetch('/api/letters', { signal: AbortSignal.timeout(8000) });
         if (!response.ok) throw new Error();
         setLetters(await response.json());
       } catch {
@@ -87,13 +94,16 @@ function App() {
     loadLetters();
   }, []);
 
-  const update = (event) => { // Kullanıcı inputa yazdığında formu günceller.
+  // Kullanıcının değiştirdiği inputun name ve value değerleriyle formu günceller.
+  const update = (event) => {
     const { name, value } = event.target;
     setForm((current) => ({ ...current, [name]: value }));
     if (errors[name]) setErrors((current) => ({ ...current, [name]: '' }));
     setNotice('');
   };
-  const validate = () => { // Kaydetmeden önce formdaki hataları kontrol eder.
+
+  // Kaydetmeden önce tüm doğrulama kurallarını çalıştırır; hata varsa kayıt işlemini durdurur.
+  const validate = () => {
     const nextErrors = zorunluAlanlariKontrolEt(form);
     const dateError = gecerlilikTarihiniKontrolEt(form);
     const emailError = epostaKontrolEt(form.authorityEmail);
@@ -108,24 +118,25 @@ function App() {
     return Object.keys(nextErrors).length === 0;
   };
 
-  const saveLetter = async (event) => { // Form geçerliyse mektubu servise gönderir ve kaydeder.
-    event.preventDefault();
+  // Form geçerliyse mektubu servise gönderir, kayıt başarılıysa tabloyu ve formu günceller.
+  const saveLetter = async (event) => {
+    event.preventDefault(); // Tarayıcının varsayılan sayfa yenilemeli form gönderimini durdurur.
     if (!validate()) {
       setNotice('Lütfen işaretli alanları kontrol edin.');
       return;
     }
-    setIsSaving(true);
+    setIsSaving(true); // Kayıt sürerken butonları pasif hâle getirerek çift kaydı önler.
     try {
       const response = await fetch('/api/letters', {
-        method: 'POST',
+        method: 'POST', // POST yeni bir kayıt oluşturur.
         headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(8000),
-        body: JSON.stringify(form)
+        signal: AbortSignal.timeout(8000), // Sekiz saniye yanıt gelmezse isteği iptal eder.
+        body: JSON.stringify(form) // Form nesnesini JSON metnine dönüştürüp servise gönderir.
       });
-      const result = await response.json();
+      const result = await response.json(); // Servisin başarı veya hata cevabını JavaScript nesnesine çevirir.
       if (!response.ok) throw new Error(result.message || 'Kayıt yapılamadı.');
-      setLetters((current) => [result, ...current]);
-      setForm(emptyForm);
+      setLetters((current) => [result, ...current]); // Yeni kaydı mevcut kayıtların başına ekler.
+      setForm(emptyForm); // Formu başlangıç değerlerine döndürür.
       setErrors({});
       setNotice('Mektup kaydı servise başarıyla kaydedildi.');
     } catch (error) {
@@ -133,7 +144,7 @@ function App() {
         ? 'Kayıt servisi 8 saniye içinde yanıt vermedi. Servisin ve geliştirme sunucusunun açık olduğunu kontrol edin.'
         : (error.message || 'Kayıt servisine ulaşılamadı.'));
     } finally {
-      setIsSaving(false);
+      setIsSaving(false); // İşlem bitince butonları tekrar kullanılabilir hâle getirir.
     }
   };
 
@@ -143,6 +154,7 @@ function App() {
     setNotice('Form temizlendi.');
   };
 
+  // JSX: App bileşeninin ekranda gösterdiği arayüz.
   return <div className="app-shell">
     <header className="topbar">
       <div className="brand-mark">B</div>
@@ -158,6 +170,7 @@ function App() {
 
       <form onSubmit={saveLetter} noValidate>
         <section className="form-card">
+          {/* Her uyarı için bir kutu oluşturur; uyarı yoksa bu bölüm görünmez. */}
           {ruleAlerts.length > 0 && <div className="rule-alerts" aria-live="polite">{ruleAlerts.map((alert, index) => <div className={`rule-alert ${alert.type}`} key={`${alert.type}-${index}`}><span>{alert.type === 'info' ? 'i' : '!'}</span>{alert.text}</div>)}</div>}
           <FormSection title="Müşteri ve işlem bilgileri" subtitle="Mektubu talep eden müşteri ve şube detayları">
             <Field label="İşlem şubesi" name="branch" value={form.branch} onChange={update} error={errors.branch} required><select name="branch" value={form.branch} onChange={update}><option value="">Şube seçin</option><option>İstanbul Merkez Şubesi</option><option>Ankara Kurumsal Şubesi</option><option>İzmir Ticari Şubesi</option><option>Bursa Organize Sanayi Şubesi</option></select></Field>
@@ -178,7 +191,9 @@ function App() {
           <FormSection title="Tutar ve geçerlilik" subtitle="Mektubun parasal ve tarih bilgileri">
             <Field label="Mektup tutarı" name="amount" value={form.amount} onChange={update} error={errors.amount} required type="number" min="0" placeholder="Örn. 15000000" inputClassName={amountOverLimit ? 'input-danger' : ''} />
             <Field label="Para birimi" name="currency" value={form.currency} onChange={update}><select name="currency" value={form.currency} onChange={update}><option>TRY</option><option>USD</option><option>EUR</option><option>GBP</option></select></Field>
+            {/* Düzenleme tarihi bugünden ilerisi olamaz. */}
             <Field label="Düzenleme tarihi" name="issueDate" value={form.issueDate} onChange={update} error={errors.issueDate} required type="date" max={today} />
+            {/* Düzenleme tarihi seçildiyse geçerlilik tarihi ondan önce seçilemez. */}
             <Field label="Geçerlilik tarihi" name="expiryDate" value={form.expiryDate} onChange={update} error={errors.expiryDate} type="date" min={form.issueDate || today} />
           </FormSection>
 
@@ -191,19 +206,25 @@ function App() {
             <Field label="Açıklama / özel not" name="notes" value={form.notes} onChange={update} className="span-2"><textarea name="notes" value={form.notes} onChange={update} rows="3" placeholder="Mektup için ek notlarınızı girin" /></Field>
           </FormSection>
         </section>
+        {/* Hata varsa mesaj uyarı görünümünde, diğer durumlarda başarı görünümünde gösterilir. */}
         {notice && <p className={Object.keys(errors).length ? 'notice warning' : 'notice'} aria-live="polite">{notice}</p>}
+        {/* Kayıt sürerken iki buton da pasiftir; Kaydet butonunun metni değişir. */}
         <div className="actions"><button type="button" className="button secondary" onClick={clearForm} disabled={isSaving}>Temizle</button><button type="submit" className="button primary" disabled={isSaving}>{isSaving ? 'Kaydediliyor…' : <>Kaydet ve Listeye Ekle <span>→</span></>}</button></div>
       </form>
 
       <section className="list-card">
         <div className="list-heading"><div><p className="eyebrow blue">KAYIT LİSTESİ</p><h2>Kaydedilen mektuplar</h2></div><span className="count">{letters.length} kayıt</span></div>
+        {/* Kayıt yoksa boş durum mesajı, varsa küçük ekranlarda kaydırılabilen tablo gösterilir. */}
         {letters.length === 0 ? <div className="empty-state"><div>▤</div><h3>Henüz kayıt bulunmuyor</h3><p>Yukarıdaki formu doldurup kaydettiğinizde mektuplar burada listelenir.</p></div> : <div className="table-wrap"><table><thead><tr><th>Referans</th><th>Müşteri</th><th>Mektup kapsamı</th><th>Muhatap</th><th>Tutar</th><th>Durum</th></tr></thead><tbody>{letters.map((letter) => <tr key={letter.id}><td>{letter.referenceNo || '—'}</td><td><strong>{letter.customerName}</strong><small>{letter.branch}</small></td><td>{letter.letterScope}<small>{letter.tenderName}</small></td><td>{letter.recipient}</td><td>{Number(letter.amount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} {letter.currency}</td><td><span className="status">{letter.status}</span></td></tr>)}</tbody></table></div>}
       </section>
     </main>
   </div>;
 }
 
+// Form bölümlerinin başlık, açıklama ve alan yerleşimini ortaklaştırır.
 function FormSection({ title, subtitle, children }) { return <div className="form-section"><div className="section-title"><h3>{title}</h3><p>{subtitle}</p></div><div className="fields">{children}</div></div>; }
+
+// Form alanlarının etiketini, input/select/textarea içeriğini ve hata mesajını ortaklaştırır.
 function Field({ label, name, value, onChange, error, required, type = 'text', placeholder, children, className = '', inputClassName = '', ...props }) {
   return <label className={`field ${className}`}><span>{label}{required && <b> *</b>}</span>{children || <input className={inputClassName} type={type} name={name} value={value} onChange={onChange} placeholder={placeholder} aria-invalid={Boolean(error)} {...props} />}{error && <em>{error}</em>}</label>;
 }
