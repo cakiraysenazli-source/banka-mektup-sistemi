@@ -5,15 +5,18 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "server": "node server.js",
+    "server": "node server-postgres.js",
+    "setup-db": "node scripts/setup-db.js",
+    "seed-users": "node scripts/seed-users.js",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
-    "vite": "latest",
+    "dotenv": "^17.4.2",
+    "pg": "^8.23.0",
     "react": "latest",
-    "react-dom": "latest"
-  },
-  "devDependencies": {}
+    "react-dom": "latest",
+    "vite": "latest"
+  }
 }

@@ -11,22 +11,49 @@ Basit bir React/Vite arayüzüdür. Mektup bilgilerini doğrular, kayıtları ta
    npm install
    ```
 
-3. İlk terminalde kayıt servisini başlatın:
+3. PostgreSQL'i bilgisayarınıza kurun ve aşağıdaki adla boş bir veritabanı oluşturun:
+
+   ```sql
+   CREATE DATABASE banka_mektup;
+   ```
+
+4. `.env.example` dosyasını `.env` olarak kopyalayın ve bağlantı bilgisini kendi PostgreSQL kullanıcı adı/parolanızla güncelleyin.
+
+5. Tabloları ve eğitim amaçlı örnek kullanıcıları oluşturun:
+
+   ```bash
+   npm run setup-db
+   npm run seed-users
+   ```
+
+6. İlk terminalde kayıt servisini başlatın:
 
    ```bash
    npm run server
    ```
 
-4. İkinci bir terminal açıp arayüzü başlatın:
+7. İkinci bir terminal açıp arayüzü başlatın:
 
    ```bash
    npm run dev
    ```
 
-5. Terminalde görünen yerel adresi (genellikle `http://localhost:5173`) tarayıcıda açın.
+8. Terminalde görünen yerel adresi (genellikle `http://localhost:5173`) tarayıcıda açın.
 
-Kayıtlar proje içindeki `data/letters.json` dosyasına yazılır; uygulamayı kapatıp açsanız da kalırlar.
+Kayıtlar PostgreSQL'deki `letters` tablosuna yazılır. Kullanıcılar ve rolleri `users` tablosunda tutulur.
+
+## Örnek kullanıcılar
+
+`npm run seed-users` komutu aşağıdaki eğitim hesaplarını ekler:
+
+| Kullanıcı adı | Parola | Rol |
+| --- | --- | --- |
+| `sube.kullanici` | `Sube123!` | Şube kullanıcısı |
+| `yetkili` | `Yetkili123!` | Yetkili |
+| `yonetici` | `Yonetici123!` | Yönetici |
+
+Bu parolalar yalnızca yerel eğitim ortamı içindir; gerçek kullanımda değiştirilmelidir.
 
 Uygulamayı üretim için kontrol etmek isterseniz `npm run build` komutunu kullanabilirsiniz.
 
-> Not: Bu örnek eğitim amaçlıdır. Kaydedilen veriler yalnızca sayfa açıkken bellekte tutulur; gerçek bankacılık kullanımı için sunucu, kullanıcı yetkilendirmesi, şifreleme ve güvenlik incelemesi gerekir.
+> Not: Bu örnek eğitim amaçlıdır. Oturumlar sunucu belleğinde tutulur ve servis yeniden başladığında kapanır. Gerçek bankacılık kullanımı için HTTPS, güvenli oturum yönetimi, kalıcı oturum deposu, denetim kaydı ve kapsamlı güvenlik incelemesi gerekir.

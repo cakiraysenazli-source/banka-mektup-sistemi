@@ -15,6 +15,7 @@ const requiredFields = ['branch', 'customerName', 'letterScope', 'tenderType', '
 const HIGH_AMOUNT_LIMIT = 10_000_000;
 const MAX_AMOUNT_LIMIT = 100_000_000;
 const DAYS_TO_EXPIRY_WARNING = 30;
+const statusLabels = { DRAFT: 'Taslak', PENDING: 'Onaya gönderildi', APPROVED: 'Onaylandı', REJECTED: 'Reddedildi' };
 
 // Her iş kuralı ayrı bir fonksiyondadır. Bu fonksiyonlar sadece sonucu döndürür;
 // ekrandaki state'i değiştirmez. Böylece tek tek test edilmeleri kolaylaşır.
@@ -60,11 +61,16 @@ const onayliKayitYetkilisiUyarisi = (form) => form.status === 'Onaylandı' && !f
 
 function App() {
   // Ana bileşen: form verisini, hata mesajlarını ve kayıt listesini yönetir.
-  const [form, setForm] = useState(emptyForm);
-  const [errors, setErrors] = useState({});
-  const [letters, setLetters] = useState([]);
-  const [notice, setNotice] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
+  const [form, setForm] = useState(emptyForm); // Formdaki tüm güncel bilgileri tutar.
+  const [errors, setErrors] = useState({}); // Alanlara ait hata mesajlarını tutmak için
+  const [letters, setLetters] = useState([]); // Kaydedilmiş mektupların listesini tutar.
+  const [notice, setNotice] = useState(''); // kullanıcıya gösterilecek mesaj 
+  const [isSaving, setIsSaving] = useState(false); // Kayıt işlemi devam ediyor mu bilgisini tutar.
+  const [sessionToken, setSessionToken] = useState(() => localStorage.getItem('letterSessionToken'));
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [loginError, setLoginError] = useState('');
+  const [loginData, setLoginData] = useState({ username: '', password: '' });
 
   // ISO tarih metninin ilk 10 karakterini (YYYY-AA-GG) alır; [] sayesinde ilk yüklemede hesaplanır.
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -80,11 +86,41 @@ function App() {
   // Üst limit aşılmışsa true olur ve tutar alanına kırmızı CSS sınıfı eklenmesini sağlar.
   const amountOverLimit = Boolean(maksimumTutariKontrolEt(form.amount, form.currency));
 
+  const apiFetch = (path, options = {}) => fetch(path, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {})
+    }
+  });
+
+  useEffect(() => {
+    const restoreSession = async () => {
+      if (!sessionToken) {
+        setAuthLoading(false);
+        return;
+      }
+      try {
+        const response = await apiFetch('/api/auth/me', { signal: AbortSignal.timeout(8000) });
+        if (!response.ok) throw new Error();
+        const result = await response.json();
+        setUser(result.user);
+      } catch {
+        localStorage.removeItem('letterSessionToken');
+        setSessionToken(null);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+    restoreSession();
+  }, [sessionToken]);
+
   // Sayfa ilk açıldığında servisten kayıtları yükler. Bu effect silinirse eski kayıtlar otomatik görünmez.
   useEffect(() => {
     const loadLetters = async () => {
+      if (!user) return;
       try {
-        const response = await fetch('/api/letters', { signal: AbortSignal.timeout(8000) });
+        const response = await apiFetch('/api/letters', { signal: AbortSignal.timeout(8000) });
         if (!response.ok) throw new Error();
         setLetters(await response.json());
       } catch {
@@ -92,7 +128,7 @@ function App() {
       }
     };
     loadLetters();
-  }, []);
+  }, [user]);
 
   // Kullanıcının değiştirdiği inputun name ve value değerleriyle formu günceller.
   const update = (event) => {
@@ -127,7 +163,7 @@ function App() {
     }
     setIsSaving(true); // Kayıt sürerken butonları pasif hâle getirerek çift kaydı önler.
     try {
-      const response = await fetch('/api/letters', {
+      const response = await apiFetch('/api/letters', {
         method: 'POST', // POST yeni bir kayıt oluşturur.
         headers: { 'Content-Type': 'application/json' },
         signal: AbortSignal.timeout(8000), // Sekiz saniye yanıt gelmezse isteği iptal eder.
@@ -154,12 +190,77 @@ function App() {
     setNotice('Form temizlendi.');
   };
 
+  const login = async (event) => {
+    event.preventDefault();
+    setLoginError('');
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(loginData)
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Giriş yapılamadı.');
+      localStorage.setItem('letterSessionToken', result.token);
+      setSessionToken(result.token);
+      setUser(result.user);
+    } catch (error) {
+      setLoginError(error.message);
+    }
+  };
+
+  const logout = async () => {
+    await apiFetch('/api/auth/logout', { method: 'POST' });
+    localStorage.removeItem('letterSessionToken');
+    setSessionToken(null);
+    setUser(null);
+    setLetters([]);
+  };
+
+  const updateStatus = async (letter, status) => {
+    const rejectionReason = status === 'REJECTED' ? window.prompt('Red nedenini girin:') : '';
+    if (status === 'REJECTED' && !rejectionReason) return;
+    try {
+      const response = await apiFetch(`/api/letters/${letter.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, rejectionReason })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Durum güncellenemedi.');
+      setLetters((current) => current.map((item) => item.id === result.id ? result : item));
+      setNotice(status === 'APPROVED' ? 'Mektup onaylandı.' : 'Mektup reddedildi.');
+    } catch (error) {
+      setNotice(error.message || 'Durum güncellenemedi.');
+    }
+  };
+
+  const deleteLetter = async (letter) => {
+    if (!window.confirm(`${letter.customerName} kaydını silmek istediğinize emin misiniz?`)) return;
+    try {
+      const response = await apiFetch(`/api/letters/${letter.id}`, { method: 'DELETE' });
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.message || 'Kayıt silinemedi.');
+      }
+      setLetters((current) => current.filter((item) => item.id !== letter.id));
+      setNotice('Mektup kaydı silindi.');
+    } catch (error) {
+      setNotice(error.message || 'Kayıt silinemedi.');
+    }
+  };
+
+  const canCreate = user && ['BRANCH', 'ADMIN'].includes(user.role);
+
+  if (authLoading) return <div className="login-page"><p>Oturum kontrol ediliyor…</p></div>;
+  if (!user) return <LoginScreen loginData={loginData} setLoginData={setLoginData} login={login} loginError={loginError} />;
+
   // JSX: App bileşeninin ekranda gösterdiği arayüz.
   return <div className="app-shell">
     <header className="topbar">
       <div className="brand-mark">B</div>
       <div><p className="eyebrow">KURUMSAL BANKACILIK</p><h1>Mektup Giriş İşlemleri</h1></div>
-      <div className="user-chip"><span className="user-dot">A</span><span>Şube Kullanıcısı</span></div>
+      <div className="user-chip"><span className="user-dot">{user.fullName.charAt(0)}</span><span>{user.fullName} · {user.roleLabel}</span><button type="button" className="logout-button" onClick={logout}>Çıkış</button></div>
     </header>
 
     <main>
@@ -168,7 +269,7 @@ function App() {
         <div className="secure-badge">⌁ Güvenli işlem ekranı</div>
       </section>
 
-      <form onSubmit={saveLetter} noValidate>
+      {canCreate ? <form onSubmit={saveLetter} noValidate>
         <section className="form-card">
           {/* Her uyarı için bir kutu oluşturur; uyarı yoksa bu bölüm görünmez. */}
           {ruleAlerts.length > 0 && <div className="rule-alerts" aria-live="polite">{ruleAlerts.map((alert, index) => <div className={`rule-alert ${alert.type}`} key={`${alert.type}-${index}`}><span>{alert.type === 'info' ? 'i' : '!'}</span>{alert.text}</div>)}</div>}
@@ -210,12 +311,12 @@ function App() {
         {notice && <p className={Object.keys(errors).length ? 'notice warning' : 'notice'} aria-live="polite">{notice}</p>}
         {/* Kayıt sürerken iki buton da pasiftir; Kaydet butonunun metni değişir. */}
         <div className="actions"><button type="button" className="button secondary" onClick={clearForm} disabled={isSaving}>Temizle</button><button type="submit" className="button primary" disabled={isSaving}>{isSaving ? 'Kaydediliyor…' : <>Kaydet ve Listeye Ekle <span>→</span></>}</button></div>
-      </form>
+      </form> : <section className="role-message"><h2>Onay ekranı</h2><p>Yetkili rolü yalnızca kayıtları onaylama veya reddetme işlemi yapabilir.</p></section>}
 
       <section className="list-card">
         <div className="list-heading"><div><p className="eyebrow blue">KAYIT LİSTESİ</p><h2>Kaydedilen mektuplar</h2></div><span className="count">{letters.length} kayıt</span></div>
         {/* Kayıt yoksa boş durum mesajı, varsa küçük ekranlarda kaydırılabilen tablo gösterilir. */}
-        {letters.length === 0 ? <div className="empty-state"><div>▤</div><h3>Henüz kayıt bulunmuyor</h3><p>Yukarıdaki formu doldurup kaydettiğinizde mektuplar burada listelenir.</p></div> : <div className="table-wrap"><table><thead><tr><th>Referans</th><th>Müşteri</th><th>Mektup kapsamı</th><th>Muhatap</th><th>Tutar</th><th>Durum</th></tr></thead><tbody>{letters.map((letter) => <tr key={letter.id}><td>{letter.referenceNo || '—'}</td><td><strong>{letter.customerName}</strong><small>{letter.branch}</small></td><td>{letter.letterScope}<small>{letter.tenderName}</small></td><td>{letter.recipient}</td><td>{Number(letter.amount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} {letter.currency}</td><td><span className="status">{letter.status}</span></td></tr>)}</tbody></table></div>}
+        {letters.length === 0 ? <div className="empty-state"><div>▤</div><h3>Henüz kayıt bulunmuyor</h3><p>Yukarıdaki formu doldurup kaydettiğinizde mektuplar burada listelenir.</p></div> : <div className="table-wrap"><table><thead><tr><th>Referans</th><th>Müşteri</th><th>Mektup kapsamı</th><th>Muhatap</th><th>Tutar</th><th>Durum</th>{['AUTHORIZED', 'ADMIN'].includes(user.role) && <th>İşlem</th>}</tr></thead><tbody>{letters.map((letter) => <tr key={letter.id}><td>{letter.referenceNo || '—'}</td><td><strong>{letter.customerName}</strong><small>{letter.branch}</small></td><td>{letter.letterScope}<small>{letter.tenderName}</small></td><td>{letter.recipient}</td><td>{Number(letter.amount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} {letter.currency}</td><td><span className="status">{statusLabels[letter.status] || letter.status}</span></td>{['AUTHORIZED', 'ADMIN'].includes(user.role) && <td><div className="review-actions">{letter.status === 'PENDING' && <><button type="button" onClick={() => updateStatus(letter, 'APPROVED')}>Onayla</button><button type="button" onClick={() => updateStatus(letter, 'REJECTED')}>Reddet</button></>}{user.role === 'ADMIN' && <button type="button" onClick={() => deleteLetter(letter)}>Sil</button>}</div></td>}</tr>)}</tbody></table></div>}
       </section>
     </main>
   </div>;
@@ -227,6 +328,11 @@ function FormSection({ title, subtitle, children }) { return <div className="for
 // Form alanlarının etiketini, input/select/textarea içeriğini ve hata mesajını ortaklaştırır.
 function Field({ label, name, value, onChange, error, required, type = 'text', placeholder, children, className = '', inputClassName = '', ...props }) {
   return <label className={`field ${className}`}><span>{label}{required && <b> *</b>}</span>{children || <input className={inputClassName} type={type} name={name} value={value} onChange={onChange} placeholder={placeholder} aria-invalid={Boolean(error)} {...props} />}{error && <em>{error}</em>}</label>;
+}
+
+function LoginScreen({ loginData, setLoginData, login, loginError }) {
+  const updateLogin = (event) => setLoginData((current) => ({ ...current, [event.target.name]: event.target.value }));
+  return <main className="login-page"><form className="login-card" onSubmit={login}><p className="eyebrow blue">BANKA MEKTUP YÖNETİMİ</p><h1>Giriş yapın</h1><p>Rolünüze uygun işlem ekranına erişmek için kullanıcı bilgilerinizle giriş yapın.</p><label>Kullanıcı adı<input name="username" value={loginData.username} onChange={updateLogin} autoComplete="username" required /></label><label>Parola<input name="password" type="password" value={loginData.password} onChange={updateLogin} autoComplete="current-password" required /></label>{loginError && <p className="login-error">{loginError}</p>}<button className="button primary" type="submit">Giriş yap</button></form></main>;
 }
 
 createRoot(document.getElementById('root')).render(<App />);
