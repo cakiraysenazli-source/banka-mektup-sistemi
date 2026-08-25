@@ -143,7 +143,10 @@ h1 {
 ========================= */
 
 main {
-  width: min(1180px, calc(100% - 36px));
+  width: min(
+    1180px,
+    calc(100% - 36px)
+  );
   margin: 36px auto 64px;
 }
 
@@ -177,6 +180,41 @@ main {
   font-weight: 600;
   background: #e7f6ed;
   white-space: nowrap;
+}
+
+/* =========================
+   EDITING BANNER
+========================= */
+
+.editing-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 12px 15px;
+  border-radius: 9px;
+  color: #215d85;
+  background: #edf7fc;
+  border: 1px solid #c7e4f2;
+  font-size: 13px;
+}
+
+.editing-banner strong {
+  white-space: nowrap;
+}
+
+.editing-banner span {
+  flex: 1;
+  color: #5d7385;
+}
+
+.editing-banner button {
+  border: 0;
+  background: transparent;
+  color: #176391;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
 }
 
 /* =========================
@@ -218,7 +256,10 @@ main {
 
 .fields {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(
+    4,
+    1fr
+  );
   gap: 17px 18px;
 }
 
@@ -382,7 +423,9 @@ textarea:focus {
   box-shadow: 0 5px 10px #17639130;
 }
 
-.button.primary:hover:not(:disabled) {
+.button.primary:hover:not(
+    :disabled
+  ) {
   background: #125477;
 }
 
@@ -397,9 +440,29 @@ textarea:focus {
   border: 1px solid #cedbe4;
 }
 
-.button.secondary:hover:not(:disabled) {
+.button.secondary:hover:not(
+    :disabled
+  ) {
   background: #f4f8fa;
 }
+
+/* TASLAK BUTONU */
+
+.button.draft-button {
+  color: #5d6570;
+  background: #eef2f5;
+  border: 1px solid #d3dce3;
+}
+
+.button.draft-button:hover:not(
+    :disabled
+  ) {
+  background: #e1e7eb;
+}
+
+/* =========================
+   NOTICE
+========================= */
 
 .notice {
   background: #e7f6ed;
@@ -624,6 +687,17 @@ td small {
   background: #fce0e3;
 }
 
+/* TASLAK DÜZENLE */
+
+.edit-button {
+  background: #edf7fc;
+  color: #215d85;
+}
+
+.edit-button:hover {
+  background: #dceff8;
+}
+
 .delete-button {
   background: #edf1f4;
   color: #526779;
@@ -643,12 +717,11 @@ td small {
   display: grid;
   place-items: center;
   padding: 24px;
-  background:
-    linear-gradient(
-      135deg,
-      #103a63,
-      #1d6388
-    );
+  background: linear-gradient(
+    135deg,
+    #103a63,
+    #1d6388
+  );
 }
 
 .login-card {
@@ -670,12 +743,11 @@ td small {
   place-items: center;
   margin-bottom: 4px;
   border-radius: 13px;
-  background:
-    linear-gradient(
-      145deg,
-      #1f668c,
-      #0c294b
-    );
+  background: linear-gradient(
+    145deg,
+    #1f668c,
+    #0c294b
+  );
   color: white;
   font-family: 'Manrope', sans-serif;
   font-size: 28px;
@@ -766,7 +838,10 @@ td small {
 
 @media (max-width: 880px) {
   .fields {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(
+      2,
+      1fr
+    );
   }
 }
 
@@ -798,6 +873,11 @@ td small {
 
   .secure-badge {
     white-space: normal;
+  }
+
+  .editing-banner {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 
