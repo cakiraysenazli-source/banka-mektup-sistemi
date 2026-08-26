@@ -219,8 +219,21 @@ const mapLetter = (letter) => ({
   address: letter.address,
   notes: letter.notes,
   status: letter.status,
-  rejectionReason:
-    letter.rejection_reason,
+
+  approvedBy:
+    letter.approved_by,
+
+  approvedAt:
+  letter.approved_at,
+
+  rejectedBy:
+    letter.rejected_by,
+    
+  rejectedAt:
+    letter.rejected_at,
+
+rejectionReason:
+  letter.rejection_reason,
   createdAt: letter.created_at
     ? new Date(
         letter.created_at
@@ -642,100 +655,122 @@ const server = createServer(
         const payload =
           await readBody(request);
 
-        /*
-         * =========================
-         * AUTHORIZED / ADMIN
-         * =========================
-         */
+/*
+ * =========================
+ * AUTHORIZED / ADMIN
+ * =========================
+ */
 
-        if (
-          ['AUTHORIZED', 'ADMIN'].includes(
-            user.role
-          )
-        ) {
-          if (
-            letter.status !==
-            'PENDING'
-          ) {
-            return sendJson(
-              response,
-              400,
-              {
-                message:
-                  'Sadece onay bekleyen mektuplar üzerinde işlem yapılabilir.',
-              }
-            );
-          }
+if (
+  ['AUTHORIZED', 'ADMIN'].includes(
+    user.role
+  )
+) {
+  if (
+    letter.status !== 'PENDING'
+  ) {
+    return sendJson(
+      response,
+      400,
+      {
+        message:
+          'Sadece onay bekleyen mektuplar üzerinde işlem yapılabilir.',
+      }
+    );
+  }
 
-          if (
-            ![
-              'APPROVED',
-              'REJECTED',
-            ].includes(
-              payload.status
-            )
-          ) {
-            return sendJson(
-              response,
-              400,
-              {
-                message:
-                  'Yetkili yalnızca onay veya ret işlemi yapabilir.',
-              }
-            );
-          }
+  if (
+    !['APPROVED', 'REJECTED'].includes(
+      payload.status
+    )
+  ) {
+    return sendJson(
+      response,
+      400,
+      {
+        message:
+          'Yetkili veya yönetici yalnızca onay veya ret işlemi yapabilir.',
+      }
+    );
+  }
 
-          if (
-            payload.status ===
-              'REJECTED' &&
-            !payload.rejectionReason?.trim()
-          ) {
-            return sendJson(
-              response,
-              400,
-              {
-                message:
-                  'Red işlemi için neden zorunludur.',
-              }
-            );
-          }
+  if (
+    payload.status === 'REJECTED' &&
+    !payload.rejectionReason?.trim()
+  ) {
+    return sendJson(
+      response,
+      400,
+      {
+        message:
+          'Red işlemi için neden zorunludur.',
+      }
+    );
+  }
 
-          const updated =
-            await pool.query(
-              `
-                UPDATE letters
-                SET
-                  status = $1,
-                  rejection_reason = $2,
-                  updated_at = NOW()
-                WHERE id = $3
-                RETURNING *
-              `,
-              [
-                payload.status,
-                payload.rejectionReason?.trim() ||
-                  null,
-                letter.id,
-              ]
-            );
+  let updated;
 
-          return sendJson(
-            response,
-            200,
-            mapLetter({
-              ...updated.rows[0],
-              created_by_name:
-                letter.created_by_name ||
-                '',
-            })
-          );
-        }
+  if (
+    payload.status === 'APPROVED'
+  ) {
+    updated = await pool.query(
+      `
+        UPDATE letters
+        SET
+          status = 'APPROVED',
+          approved_by = $1,
+          approved_at = NOW(),
+          rejected_by = NULL,
+          rejected_at = NULL,
+          rejection_reason = NULL,
+          updated_at = NOW()
+        WHERE id = $2
+        RETURNING *
+      `,
+      [
+        user.id,
+        letter.id,
+      ]
+    );
+  } else {
+    updated = await pool.query(
+      `
+        UPDATE letters
+        SET
+          status = 'REJECTED',
+          rejection_reason = $1,
+          rejected_by = $2,
+          rejected_at = NOW(),
+          approved_by = NULL,
+          approved_at = NULL,
+          updated_at = NOW()
+        WHERE id = $3
+        RETURNING *
+      `,
+      [
+        payload.rejectionReason.trim(),
+        user.id,
+        letter.id,
+      ]
+    );
+  }
 
-        /*
-         * =========================
-         * BRANCH - DRAFT EDIT
-         * =========================
-         */
+  return sendJson(
+    response,
+    200,
+    mapLetter({
+      ...updated.rows[0],
+      created_by_name:
+        letter.created_by_name || '',
+    })
+  );
+}
+
+/*
+ * =========================
+ * BRANCH - DRAFT EDIT
+ * =========================
+ */
 
         if (
           user.role === 'BRANCH' &&
