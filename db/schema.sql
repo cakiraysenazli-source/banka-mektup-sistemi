@@ -1,3 +1,16 @@
+
+
+-- ==========================================================
+-- DATABASE TABLES AND INDEXES
+-- ==========================================================
+-- Kullanıcıları ve mektupları veritabanında saklamak için
+-- gerekli tabloları oluşturur.
+-- Users tablosu kullanıcı bilgilerini ve rollerini,
+-- letters tablosu ise mektup bilgilerini ve durumlarını tutar.
+-- Ayrıca mektupların hangi kullanıcı tarafından oluşturulduğunu
+-- users tablosuna bağlar ve sorguları hızlandırmak için indexler oluşturur.
+
+
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY,
   username VARCHAR(80) UNIQUE NOT NULL,

@@ -1,3 +1,13 @@
+
+// ==========================================================
+// ÖRNEK KULLANICILARI VERİTABANINA EKLEME
+// ==========================================================
+// Veritabanına bağlantı kurarak örnek kullanıcı hesapları oluşturur.
+// Kullanıcı şifrelerini güvenlik amacıyla hash'leyerek saklar.
+// Aynı kullanıcı daha önce eklenmişse tekrar eklemez.
+// İşlem tamamlandıktan sonra veritabanı bağlantısını kapatır.
+
+
 import 'dotenv/config';
 import { randomUUID, scryptSync } from 'node:crypto';
 import pool from '../database.js';
