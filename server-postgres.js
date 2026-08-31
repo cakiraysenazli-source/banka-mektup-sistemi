@@ -1,3 +1,6 @@
+// Frontend ile PostgreSQL arasındaki iletişimi yöneten backend/API sunucusu.
+// Kullanıcı girişlerini, yetkilendirmeyi, mektup işlemlerini ve onay/ret süreçlerini yönetir.
+
 import 'dotenv/config';
 import { createServer } from 'node:http';
 import {
@@ -221,16 +224,16 @@ const mapLetter = (letter) => ({
   status: letter.status,
 
   approvedBy:
-    letter.approved_by,
+    letter.approved_by_name || '',
 
   approvedAt:
-  letter.approved_at,
+    letter.approved_at || '',
 
   rejectedBy:
-    letter.rejected_by,
-    
+    letter.rejected_by_name || '',
+
   rejectedAt:
-    letter.rejected_at,
+    letter.rejected_at || '',
 
 rejectionReason:
   letter.rejection_reason,
@@ -269,26 +272,41 @@ const listLetters = async (user) => {
   const branchOnly =
     user.role === 'BRANCH';
 
+  //Aşağıda SELECT ile başlayan gerçek SQL sorgusu. 
+  //Letters tablosundaki mektupları getir. Ayrıca bu mektubu oluşturan kullanıcının adını users tablosundan getir.
   const query = `
     SELECT
       letters.*,
-      users.full_name AS created_by_name
+
+      creator.full_name AS created_by_name,
+      approver.full_name AS approved_by_name,
+      rejector.full_name AS rejected_by_name
+
     FROM letters
-    JOIN users
-      ON users.id = letters.created_by
+
+    JOIN users AS creator
+      ON creator.id = letters.created_by
+
+    LEFT JOIN users AS approver
+      ON approver.id = letters.approved_by
+
+    LEFT JOIN users AS rejector
+      ON rejector.id = letters.rejected_by
+
     ${
       branchOnly
         ? 'WHERE letters.created_by = $1'
         : ''
     }
+
     ORDER BY letters.created_at DESC
   `;
-
+  // pool.query() ile sorguyu çalıştır ve sonuçları al
   const result = await pool.query(
     query,
     branchOnly ? [user.id] : []
   );
-
+  // Sonuçları react'ın anlayacağı şekilde döndür. Dönüşümü mapLetter() yapıyor.
   return result.rows.map(mapLetter);
 };
 
@@ -422,7 +440,7 @@ const server = createServer(
        * GET LETTERS
        * =========================
        */
-
+      ///api/letters istendi. listLetters() fonksiyonunu çalıştırayım
       if (
         request.method === 'GET' &&
         request.url ===

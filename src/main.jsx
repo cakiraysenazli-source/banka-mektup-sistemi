@@ -609,7 +609,7 @@ function App() {
         if (!user) return;
 
         try {
-
+          // API'den mektupları çek, apiFetch de session token'ı ekliyor:
           const response =
             await apiFetch(
               '/api/letters',
@@ -640,7 +640,7 @@ function App() {
 
     loadLetters();
 
-  }, [user]);
+  }, [user]); 
 
 
   // ==========================================================
