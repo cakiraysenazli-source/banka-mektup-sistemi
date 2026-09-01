@@ -1,27 +1,18 @@
-// React'ten uygulamada kullanacağımız Hook'ları import ediyoruz.
-// useState  -> component içinde değişken/state tutmamızı sağlar.
-// useEffect -> belirli bir state değiştiğinde veya component açıldığında
-//              yan etkili işlemler yapmamızı sağlar.
-// useMemo   -> hesaplanan bir değeri gereksiz yere tekrar hesaplamamak için kullanılır.
 import React, {
   useEffect,
   useMemo,
   useState,
 } from 'react';
 
-// React uygulamasını HTML'deki root elementine bağlamak için kullanılır.
 import { createRoot } from 'react-dom/client';
 
-// Uygulamanın CSS dosyasını içeri aktarıyoruz.
 import './styles.css';
 
 
 // ============================================================
-// 1. FORMUN BAŞLANGIÇ DEĞERLERİ
+// FORM BAŞLANGIÇ DEĞERLERİ
 // ============================================================
 
-// Yeni bir mektup oluşturulduğunda formun başlangıçta sahip olacağı değerler.
-// Form temizlendiğinde de tekrar bu obje kullanılır.
 const emptyForm = {
   branch: '',
   customerName: '',
@@ -34,7 +25,7 @@ const emptyForm = {
   authorityName: '',
   authorityPhone: '',
   authorityEmail: '',
-  currency: 'TRY', // Para biriminin varsayılan değeri TRY
+  currency: 'TRY',
   amount: '',
   issueDate: '',
   expiryDate: '',
@@ -46,11 +37,9 @@ const emptyForm = {
 
 
 // ============================================================
-// 2. ZORUNLU ALANLAR
+// ZORUNLU ALANLAR
 // ============================================================
 
-// Kullanıcı "Kaydet ve Onaya Gönder" dediğinde
-// mutlaka doldurulması gereken alanların isimleri.
 const requiredFields = [
   'branch',
   'customerName',
@@ -64,29 +53,18 @@ const requiredFields = [
 
 
 // ============================================================
-// 3. İŞ KURALI LİMİTLERİ
+// İŞ KURALLARI
 // ============================================================
 
-// 10 milyon ve üzerindeki mektuplar yüksek tutarlı kabul edilir.
 const HIGH_AMOUNT_LIMIT = 10_000_000;
-
-// Mektubun ulaşabileceği maksimum tutar.
 const MAX_AMOUNT_LIMIT = 100_000_000;
-
-// Geçerlilik süresi 30 gün veya daha azsa kullanıcıya uyarı gösterilir.
 const DAYS_TO_EXPIRY_WARNING = 30;
 
 
 // ============================================================
-// 4. DURUM ETİKETLERİ
+// DURUM ETİKETLERİ
 // ============================================================
 
-// Veritabanında İngilizce olarak tuttuğumuz status değerlerini
-// kullanıcıya Türkçe göstermek için kullanıyoruz.
-//
-// Örneğin:
-// PENDING   -> Onay bekliyor
-// APPROVED  -> Onaylandı
 const statusLabels = {
   DRAFT: 'Taslak',
   PENDING: 'Onay bekliyor',
@@ -96,111 +74,66 @@ const statusLabels = {
 
 
 // ============================================================
-// 5. ZORUNLU ALAN KONTROLÜ
+// ZORUNLU ALAN KONTROLÜ
 // ============================================================
 
 const zorunluAlanlariKontrolEt = (form) => {
-
-  // Hataları burada obje olarak tutacağız.
-  //
-  // Örneğin:
-  // {
-  //   customerName: "Bu alan zorunludur."
-  // }
   const errors = {};
 
-  // requiredFields dizisindeki bütün alanları tek tek kontrol ediyoruz.
   requiredFields.forEach((field) => {
-
-    // form[field] ile alanın değerine ulaşıyoruz.
-    //
-    // ?? '' :
-    // Eğer değer null veya undefined ise boş string kullan.
-    //
-    // trim():
-    // Kullanıcının sadece boşluk girmesini de boş kabul eder.
-    if (
-      !String(
-        form[field] ?? ''
-      ).trim()
-    ) {
-
-      // Alan boşsa hata mesajı oluşturuyoruz.
-      errors[field] =
-        'Bu alan zorunludur.';
+    if (!String(form[field] ?? '').trim()) {
+      errors[field] = 'Bu alan zorunludur.';
     }
   });
 
-  // Oluşturduğumuz hata objesini geri döndürüyoruz.
   return errors;
 };
 
 
 // ============================================================
-// 6. TARİH KONTROLÜ
+// TARİH KONTROLÜ
 // ============================================================
 
-// Geçerlilik tarihinin düzenleme tarihinden önce olup olmadığını kontrol eder.
 const gecerlilikTarihiniKontrolEt = (form) => {
-
-  // İki tarih de girilmişse kontrol yapıyoruz.
   if (
     form.issueDate &&
     form.expiryDate &&
-
-    // Geçerlilik tarihi düzenleme tarihinden küçükse
-    form.expiryDate <
-      form.issueDate
+    form.expiryDate < form.issueDate
   ) {
-
     return 'Geçerlilik tarihi düzenleme tarihinden önce olamaz.';
   }
 
-  // Hata yoksa boş string döndürürüz.
   return '';
 };
 
 
 // ============================================================
-// 7. E-POSTA KONTROLÜ
+// E-POSTA KONTROLÜ
 // ============================================================
 
 const epostaKontrolEt = (email) => {
+  if (!email) {
+    return '';
+  }
 
-  // E-posta alanı boş bırakılabiliyorsa hata verme.
-  if (!email) return '';
-
-  // Regular Expression (regex) ile basit e-posta formatı kontrolü.
-  //
-  // Örnek geçerli:
-  // example@gmail.com
-  //
-  // Geçersiz:
-  // example
-  // example@
-  return !/^\S+@\S+\.\S+$/.test(
-    email
-  )
+  return !/^\S+@\S+\.\S+$/.test(email)
     ? 'Geçerli bir e-posta adresi girin.'
     : '';
 };
 
 
 // ============================================================
-// 8. MAKSİMUM TUTAR KONTROLÜ
+// MAKSİMUM TUTAR KONTROLÜ
 // ============================================================
 
 const maksimumTutariKontrolEt = (
   amount,
   currency
 ) => {
-
-  // Number() ile input değerini sayıya çeviriyoruz.
   if (
-    Number(amount) >
-    MAX_AMOUNT_LIMIT
+    amount !== '' &&
+    Number(amount) > MAX_AMOUNT_LIMIT
   ) {
-
     return `Mektup tutarı ${MAX_AMOUNT_LIMIT.toLocaleString(
       'tr-TR'
     )} ${currency} limitini aşamaz.`;
@@ -211,21 +144,14 @@ const maksimumTutariKontrolEt = (
 
 
 // ============================================================
-// 9. SÜRELİ MEKTUP KONTROLÜ
+// SÜRELİ MEKTUP KONTROLÜ
 // ============================================================
 
-// Eğer mektup "Süreli" seçilmişse,
-// geçerlilik tarihinin girilmesini zorunlu hale getiriyoruz.
-const sureliMektubuKontrolEt = (
-  form
-) => {
-
+const sureliMektubuKontrolEt = (form) => {
   if (
-    form.letterLicense ===
-      'Süreli' &&
+    form.letterLicense === 'Süreli' &&
     !form.expiryDate
   ) {
-
     return 'Süreli mektup için geçerlilik tarihi zorunludur.';
   }
 
@@ -234,57 +160,44 @@ const sureliMektubuKontrolEt = (
 
 
 // ============================================================
-// 10. YÜKSEK TUTAR UYARISI
+// YÜKSEK TUTAR UYARISI
 // ============================================================
 
-// Mektup 10 milyon TL veya daha yüksekse,
-// kullanıcıya uyarı gösteriyoruz.
-//
-// Bu bir ERROR değildir.
-// Kullanıcı işlemi devam ettirebilir.
 const yuksekTutarUyarisi = (
   amount,
   currency
 ) => {
-
   if (
-    Number(amount) >=
-      HIGH_AMOUNT_LIMIT &&
-    Number(amount) <=
-      MAX_AMOUNT_LIMIT
+    amount !== '' &&
+    Number(amount) >= HIGH_AMOUNT_LIMIT &&
+    Number(amount) <= MAX_AMOUNT_LIMIT
   ) {
-
     return {
       type: 'warning',
-
       text: `Yüksek tutarlı mektup: ${HIGH_AMOUNT_LIMIT.toLocaleString(
         'tr-TR'
       )} ${currency} ve üzerindeki kayıtlar yetkili onayı gerektirir.`,
     };
   }
 
-  // Uyarı yoksa null döndürürüz.
   return null;
 };
 
 
 // ============================================================
-// 11. MAKSİMUM LİMİT AŞIMI UYARISI
+// LİMİT AŞIMI UYARISI
 // ============================================================
 
 const limitAsimiUyarisi = (
   amount,
   currency
 ) => {
-
   if (
-    Number(amount) >
-    MAX_AMOUNT_LIMIT
+    amount !== '' &&
+    Number(amount) > MAX_AMOUNT_LIMIT
   ) {
-
     return {
       type: 'error',
-
       text: `Limit aşıldı: Mektup tutarı ${MAX_AMOUNT_LIMIT.toLocaleString(
         'tr-TR'
       )} ${currency} üst sınırını geçemez.`,
@@ -296,14 +209,10 @@ const limitAsimiUyarisi = (
 
 
 // ============================================================
-// 12. KISA GEÇERLİLİK SÜRESİ UYARISI
+// KISA GEÇERLİLİK UYARISI
 // ============================================================
 
-const kisaGecerlilikUyarisi = (
-  form
-) => {
-
-  // Tarihlerden biri yoksa hesaplama yapamayız.
+const kisaGecerlilikUyarisi = (form) => {
   if (
     !form.issueDate ||
     !form.expiryDate
@@ -311,32 +220,32 @@ const kisaGecerlilikUyarisi = (
     return null;
   }
 
-  // İki tarihi JavaScript Date objesine çeviriyoruz.
-  //
-  // T00:00:00 eklememizin sebebi:
-  // tarihi gece 00:00 olarak değerlendirmek.
+  const issueDate = new Date(
+    `${form.issueDate}T00:00:00`
+  );
+
+  const expiryDate = new Date(
+    `${form.expiryDate}T00:00:00`
+  );
+
+  if (
+    Number.isNaN(issueDate.getTime()) ||
+    Number.isNaN(expiryDate.getTime())
+  ) {
+    return null;
+  }
+
   const days = Math.ceil(
-    (
-      new Date(
-        `${form.expiryDate}T00:00:00`
-      ) -
-      new Date(
-        `${form.issueDate}T00:00:00`
-      )
-    ) /
+    (expiryDate - issueDate) /
       86_400_000
   );
 
-  // Geçerlilik süresi 0-30 gün arasındaysa uyarı ver.
   if (
     days >= 0 &&
-    days <=
-      DAYS_TO_EXPIRY_WARNING
+    days <= DAYS_TO_EXPIRY_WARNING
   ) {
-
     return {
       type: 'warning',
-
       text: `Kısa geçerlilik süresi: Mektubun geçerliliği ${days} gün. Muhatap şartlarını kontrol edin.`,
     };
   }
@@ -346,57 +255,33 @@ const kisaGecerlilikUyarisi = (
 
 
 // ============================================================
-// 13. ANA REACT COMPONENT'I
+// ANA APP
 // ============================================================
 
 function App() {
+  const [form, setForm] = useState({
+    ...emptyForm,
+  });
 
-  // ----------------------------------------------------------
-  // FORM STATE
-  // ----------------------------------------------------------
+  const [
+    editingDraftId,
+    setEditingDraftId,
+  ] = useState(null);
 
-  // Formdaki bütün alanların değerlerini tutuyoruz.
-  const [form, setForm] =
-    useState(emptyForm);
+  const [errors, setErrors] = useState({});
 
+  const [letters, setLetters] = useState([]);
 
-  // Şu anda bir taslak düzenleniyor mu?
-  //
-  // null  -> yeni kayıt
-  // ID    -> mevcut taslak düzenleniyor
-  const [editingDraftId, setEditingDraftId] =
-    useState(null);
+  const [notice, setNotice] = useState('');
 
-
-  // Formdaki validation hatalarını tutar.
-  const [errors, setErrors] =
-    useState({});
-
-
-  // PostgreSQL'den gelen mektup kayıtlarını tutar.
-  const [letters, setLetters] =
-    useState([]);
-
-
-  // Kullanıcıya gösterilecek genel mesaj.
-  const [notice, setNotice] =
-    useState('');
-
-
-  // Kayıt gönderilirken true olur.
-  // Böylece butonları geçici olarak disable edebiliriz.
   const [isSaving, setIsSaving] =
     useState(false);
 
 
-  // ----------------------------------------------------------
-  // LOGIN / SESSION STATE
-  // ----------------------------------------------------------
+  // ==========================================================
+  // LOGIN / SESSION
+  // ==========================================================
 
-  // Daha önce login olunmuşsa token'ı localStorage'dan alıyoruz.
-  //
-  // Böylece kullanıcı sayfayı yenilediğinde tekrar login olmak
-  // zorunda kalmayabilir.
   const [sessionToken, setSessionToken] =
     useState(() =>
       localStorage.getItem(
@@ -404,30 +289,18 @@ function App() {
       )
     );
 
-
-  // PostgreSQL/backend tarafından doğrulanan kullanıcı bilgisi.
-  //
-  // Örnek:
-  // {
-  //   username: "sube.kullanici",
-  //   role: "BRANCH",
-  //   fullName: "Ayşe Şube Kullanıcısı"
-  // }
   const [user, setUser] =
     useState(null);
 
-
-  // Kullanıcının session'ı kontrol edilirken true.
   const [authLoading, setAuthLoading] =
     useState(true);
 
-
-  // Login sırasında oluşan hata mesajı.
   const [loginError, setLoginError] =
     useState('');
 
+  const [isLoggingIn, setIsLoggingIn] =
+    useState(false);
 
-  // Login formundaki kullanıcı adı ve parola.
   const [loginData, setLoginData] =
     useState({
       username: '',
@@ -435,14 +308,10 @@ function App() {
     });
 
 
-  // ----------------------------------------------------------
-  // BUGÜNÜN TARİHİ
-  // ----------------------------------------------------------
+  // ==========================================================
+  // BUGÜN
+  // ==========================================================
 
-  // Bugünün tarihini YYYY-MM-DD formatına çeviriyoruz.
-  //
-  // useMemo sayesinde component her render olduğunda
-  // tekrar hesaplanmaz.
   const today = useMemo(
     () =>
       new Date()
@@ -452,77 +321,60 @@ function App() {
   );
 
 
-  // ----------------------------------------------------------
-  // FORM KURALLARINA GÖRE UYARILAR
-  // ----------------------------------------------------------
+  // ==========================================================
+  // KURAL UYARILARI
+  // ==========================================================
 
-  // Formdaki tutar ve tarih gibi alanlara göre
-  // kullanıcıya gösterilecek uyarıları hesaplıyoruz.
   const ruleAlerts = useMemo(
     () =>
       [
-
-        // 100 milyon üzerindeyse hata
         limitAsimiUyarisi(
           form.amount,
           form.currency
         ),
 
-        // 10 milyon üzerindeyse yüksek tutar uyarısı
         yuksekTutarUyarisi(
           form.amount,
           form.currency
         ),
 
-        // Geçerlilik süresi 30 gün veya daha azsa uyarı
-        kisaGecerlilikUyarisi(
-          form
-        ),
-
-      // null değerleri listeden çıkarıyoruz.
+        kisaGecerlilikUyarisi(form),
       ].filter(Boolean),
 
-    // form değiştiğinde uyarıları tekrar hesapla.
     [form]
   );
 
 
-  // Tutar maksimum limiti geçti mi?
-  //
-  // Boolean(...) sonucu true veya false olur.
-  const amountOverLimit =
-    Boolean(
-      maksimumTutariKontrolEt(
-        form.amount,
-        form.currency
-      )
-    );
+  // ==========================================================
+  // TUTAR LİMİT KONTROLÜ
+  // ==========================================================
+
+  const amountOverLimit = Boolean(
+    maksimumTutariKontrolEt(
+      form.amount,
+      form.currency
+    )
+  );
 
 
   // ==========================================================
   // API REQUEST HELPER
   // ==========================================================
 
-  // Backend'e yapılan bütün isteklerde session token'ı
-  // Authorization header'ına otomatik olarak ekliyoruz.
   const apiFetch = (
     path,
     options = {}
   ) =>
     fetch(path, {
-
-      // GET, POST, PATCH gibi options değerlerini koru.
       ...options,
 
       headers: {
-
-        // Önceden verilmiş header'ları koru.
         ...(options.headers || {}),
 
-        // Kullanıcı login olmuşsa token gönder.
         ...(sessionToken
           ? {
-              Authorization: `Bearer ${sessionToken}`,
+              Authorization:
+                `Bearer ${sessionToken}`,
             }
           : {}),
       },
@@ -533,200 +385,152 @@ function App() {
   // SESSION KONTROLÜ
   // ==========================================================
 
-  // Component açıldığında veya sessionToken değiştiğinde çalışır.
   useEffect(() => {
+    const restoreSession = async () => {
+      if (!sessionToken) {
+        setUser(null);
+        setLetters([]);
+        setAuthLoading(false);
 
-    const restoreSession =
-      async () => {
+        return;
+      }
 
-        // Token yoksa login yapılmamış demektir.
-        if (!sessionToken) {
-          setAuthLoading(false);
-          return;
-        }
+      setAuthLoading(true);
 
-        try {
-
-          // Backend'e "Ben kimim?" diye soruyoruz.
-          const response =
-            await apiFetch(
-              '/api/auth/me',
-              {
-                signal:
-                  AbortSignal.timeout(
-                    8000
-                  ),
-              }
-            );
-
-          // HTTP response başarılı değilse hata oluştur.
-          if (!response.ok) {
-            throw new Error();
-          }
-
-          // Backend'in JSON cevabını al.
-          const result =
-            await response.json();
-
-          // Kullanıcı bilgilerini state'e kaydet.
-          setUser(result.user);
-
-        } catch {
-
-          // Token geçersizse localStorage'dan sil.
-          localStorage.removeItem(
-            'letterSessionToken'
+      try {
+        const response =
+          await apiFetch(
+            '/api/auth/me',
+            {
+              signal:
+                AbortSignal.timeout(
+                  8000
+                ),
+            }
           );
 
-          setSessionToken(null);
-
-        } finally {
-
-          // Session kontrolü tamamlandı.
-          setAuthLoading(false);
+        if (!response.ok) {
+          throw new Error();
         }
-      };
+
+        const result =
+          await response.json();
+
+        setUser(result.user);
+      } catch {
+        localStorage.removeItem(
+          'letterSessionToken'
+        );
+
+        setSessionToken(null);
+        setUser(null);
+        setLetters([]);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
 
     restoreSession();
-
   }, [sessionToken]);
 
 
   // ==========================================================
-  // MEKTUPLARI BACKEND'DEN ÇEKME
+  // MEKTUPLARI ÇEK
   // ==========================================================
 
-  // user değiştiğinde çalışır.
-  //
-  // Kullanıcı login olduğunda user değişir ve
-  // mektuplar backend'den çekilir.
   useEffect(() => {
+    const loadLetters = async () => {
+      if (!user) {
+        setLetters([]);
+        return;
+      }
 
-    const loadLetters =
-      async () => {
-
-        // Kullanıcı login değilse mektupları çekme.
-        if (!user) return;
-
-        try {
-          // API'den mektupları çek, apiFetch de session token'ı ekliyor:
-          const response =
-            await apiFetch(
-              '/api/letters',
-              {
-                signal:
-                  AbortSignal.timeout(
-                    8000
-                  ),
-              }
-            );
-
-          if (!response.ok) {
-            throw new Error();
-          }
-
-          // Backend'den gelen mektupları state'e koy.
-          setLetters(
-            await response.json()
+      try {
+        const response =
+          await apiFetch(
+            '/api/letters',
+            {
+              signal:
+                AbortSignal.timeout(
+                  8000
+                ),
+            }
           );
 
-        } catch {
-
-          setNotice(
-            'Kayıt servisine ulaşılamadı. Önce "npm run server" komutunu çalıştırın.'
-          );
+        if (!response.ok) {
+          throw new Error();
         }
-      };
+
+        const result =
+          await response.json();
+
+        setLetters(
+          Array.isArray(result)
+            ? result
+            : []
+        );
+      } catch {
+        setNotice(
+          'Kayıt servisine ulaşılamadı. Önce "npm run server" komutunu çalıştırın.'
+        );
+      }
+    };
 
     loadLetters();
-
-  }, [user]); 
+  }, [user]);
 
 
   // ==========================================================
-  // FORM DEĞİŞİKLİĞİ
+  // FORM UPDATE
   // ==========================================================
 
   const update = (event) => {
-
-    // Input'un name ve value değerlerini alıyoruz.
     const {
       name,
       value,
     } = event.target;
 
-    // Sadece değiştirilen alanı güncelliyoruz.
-    //
-    // ...current:
-    // Formdaki diğer alanları korur.
-    //
-    // [name]:
-    // Dinamik property kullanımıdır.
     setForm((current) => ({
       ...current,
       [name]: value,
     }));
 
-
-    // Kullanıcı hatalı alanı düzeltmeye başladıysa
-    // o alandaki hata mesajını kaldır.
     if (errors[name]) {
-
       setErrors((current) => ({
         ...current,
         [name]: '',
       }));
     }
 
-    // Önceki bilgilendirme mesajını temizle.
     setNotice('');
   };
 
 
   // ==========================================================
-  // NORMAL FORM VALIDATION
+  // VALIDATION
   // ==========================================================
 
-  // "Kaydet ve Onaya Gönder" işleminde kullanılır.
   const validate = () => {
-
-    // Önce zorunlu alanları kontrol et.
     const nextErrors =
-      zorunluAlanlariKontrolEt(
-        form
-      );
+      zorunluAlanlariKontrolEt(form);
 
-
-    // Tarih kontrolü
     const dateError =
-      gecerlilikTarihiniKontrolEt(
-        form
-      );
+      gecerlilikTarihiniKontrolEt(form);
 
-
-    // E-posta kontrolü
     const emailError =
       epostaKontrolEt(
         form.authorityEmail
       );
 
-
-    // Maksimum tutar kontrolü
     const amountError =
       maksimumTutariKontrolEt(
         form.amount,
         form.currency
       );
 
-
-    // Süreli mektup kontrolü
     const termError =
-      sureliMektubuKontrolEt(
-        form
-      );
+      sureliMektubuKontrolEt(form);
 
-
-    // Hata varsa ilgili input'a bağla.
     if (dateError) {
       nextErrors.expiryDate =
         dateError;
@@ -747,13 +551,8 @@ function App() {
         termError;
     }
 
-
-    // Hataları state'e kaydet.
     setErrors(nextErrors);
 
-
-    // Hata objesinin key sayısı 0 ise
-    // validation başarılıdır.
     return (
       Object.keys(nextErrors)
         .length === 0
@@ -765,33 +564,22 @@ function App() {
   // TASLAK VALIDATION
   // ==========================================================
 
-  // Taslak kaydedilirken bütün zorunlu alanların
-  // doldurulması gerekmez.
-  //
-  // Örneğin kullanıcı formu yarıda bırakıp taslak kaydedebilir.
   const validateDraft = () => {
-
     const nextErrors = {};
 
-    // Taslakta yine tarih mantığı kontrol edilir.
     const dateError =
-      gecerlilikTarihiniKontrolEt(
-        form
-      );
+      gecerlilikTarihiniKontrolEt(form);
 
-    // E-posta formatı kontrol edilir.
     const emailError =
       epostaKontrolEt(
         form.authorityEmail
       );
 
-    // Tutar limiti kontrol edilir.
     const amountError =
       maksimumTutariKontrolEt(
         form.amount,
         form.currency
       );
-
 
     if (dateError) {
       nextErrors.expiryDate =
@@ -808,7 +596,6 @@ function App() {
         amountError;
     }
 
-
     setErrors(nextErrors);
 
     return (
@@ -819,34 +606,21 @@ function App() {
 
 
   // ==========================================================
-  // MEKTUP KAYDETME / TASLAK KAYDETME
+  // MEKTUP KAYDET
   // ==========================================================
 
-  // status:
-  //
-  // DRAFT   -> Taslak olarak kaydet
-  // PENDING -> Onaya gönder
   const saveLetter = async (
     event,
     status = 'PENDING'
   ) => {
-
-    // Eğer form submit oluyorsa sayfanın refresh olmasını engeller.
     if (event) {
       event.preventDefault();
     }
 
-
-    // --------------------------------------------------------
-    // ONAYA GÖNDERME VALIDATION
-    // --------------------------------------------------------
-
-    // PENDING ise bütün zorunlu alanlar doldurulmalı.
     if (
       status === 'PENDING' &&
       !validate()
     ) {
-
       setNotice(
         'Lütfen işaretli alanları kontrol edin.'
       );
@@ -854,17 +628,10 @@ function App() {
       return;
     }
 
-
-    // --------------------------------------------------------
-    // TASLAK VALIDATION
-    // --------------------------------------------------------
-
-    // Taslakta sadece mantıksal hataları kontrol ediyoruz.
     if (
       status === 'DRAFT' &&
       !validateDraft()
     ) {
-
       setNotice(
         'Lütfen işaretli alanları kontrol edin.'
       );
@@ -872,26 +639,19 @@ function App() {
       return;
     }
 
-
-    // Kaydetme işlemi başladı.
     setIsSaving(true);
-
+    setNotice('');
 
     try {
 
       // ======================================================
-      // MEVCUT TASLAĞI ONAYA GÖNDER
+      // TASLAĞI ONAYA GÖNDER
       // ======================================================
 
-      // editingDraftId varsa mevcut bir taslak düzenleniyor.
-      //
-      // Status PENDING ise artık taslak olmaktan çıkıp
-      // onay bekleyen duruma geçecek.
       if (
         editingDraftId &&
         status === 'PENDING'
       ) {
-
         const response =
           await apiFetch(
             `/api/letters/${editingDraftId}`,
@@ -908,17 +668,15 @@ function App() {
                   8000
                 ),
 
-              // Formdaki güncel bilgileri backend'e gönder.
-              body: JSON.stringify(
-                form
-              ),
+              body: JSON.stringify({
+                ...form,
+                status: 'PENDING',
+              }),
             }
           );
 
-
         const result =
           await response.json();
-
 
         if (!response.ok) {
           throw new Error(
@@ -927,28 +685,21 @@ function App() {
           );
         }
 
-
-        // Güncellenen kaydı frontend'deki
-        // letters listesinde de güncelliyoruz.
-        setLetters(
-          (current) =>
-            current.map(
-              (item) =>
-                item.id ===
-                result.id
-                  ? result
-                  : item
-            )
+        setLetters((current) =>
+          current.map((item) =>
+            item.id === result.id
+              ? result
+              : item
+          )
         );
 
-
-        // İşlem bittikten sonra formu temizle.
-        setForm(emptyForm);
+        setForm({
+          ...emptyForm,
+        });
 
         setEditingDraftId(null);
 
         setErrors({});
-
 
         setNotice(
           'Taslak başarıyla güncellendi ve onaya gönderildi.'
@@ -959,7 +710,7 @@ function App() {
 
 
       // ======================================================
-      // YENİ MEKTUP KAYDI
+      // YENİ MEKTUP
       // ======================================================
 
       const response =
@@ -978,7 +729,6 @@ function App() {
                 8000
               ),
 
-            // Form bilgilerini JSON olarak backend'e gönder.
             body: JSON.stringify({
               ...form,
               status,
@@ -986,10 +736,8 @@ function App() {
           }
         );
 
-
       const result =
         await response.json();
-
 
       if (!response.ok) {
         throw new Error(
@@ -998,73 +746,57 @@ function App() {
         );
       }
 
-
-      // Yeni kaydı listenin en başına ekliyoruz.
       setLetters((current) => [
         result,
         ...current,
       ]);
 
-
-      // Formu temizle.
-      setForm(emptyForm);
+      setForm({
+        ...emptyForm,
+      });
 
       setEditingDraftId(null);
 
       setErrors({});
 
-
-      // Kullanıcıya işlemin sonucunu bildir.
       if (status === 'DRAFT') {
-
         setNotice(
           'Mektup taslak olarak kaydedildi. Daha sonra düzenleyip onaya gönderebilirsiniz.'
         );
-
       } else {
-
         setNotice(
           'Mektup başarıyla kaydedildi ve onay bekleyen kayıtlara gönderildi.'
         );
       }
 
-
     } catch (error) {
 
-      // Backend cevap vermediyse timeout mesajı göster.
       setNotice(
-        error.name ===
-          'TimeoutError'
+        error.name === 'TimeoutError'
           ? 'Kayıt servisi 8 saniye içinde yanıt vermedi. Backend servisinin açık olduğunu kontrol edin.'
           : error.message ||
               'Kayıt servisine ulaşılamadı.'
       );
 
     } finally {
-
-      // Başarılı veya başarısız fark etmez,
-      // kaydetme işlemi sona erdi.
       setIsSaving(false);
     }
   };
 
 
   // ==========================================================
-  // FORMU TEMİZLE
+  // FORM TEMİZLE
   // ==========================================================
 
   const clearForm = () => {
+    setForm({
+      ...emptyForm,
+    });
 
-    // Formu başlangıç haline döndür.
-    setForm(emptyForm);
-
-    // Taslak düzenleme modundan çık.
     setEditingDraftId(null);
 
-    // Validation hatalarını temizle.
     setErrors({});
 
-    // Kullanıcıya bilgi ver.
     setNotice(
       'Form temizlendi.'
     );
@@ -1072,28 +804,38 @@ function App() {
 
 
   // ==========================================================
+  // TARİH FORMATLAMA
+  // ==========================================================
+
+  const formatDateForInput = (
+    date
+  ) => {
+    if (!date) {
+      return '';
+    }
+
+    const parsedDate =
+      new Date(date);
+
+    if (
+      Number.isNaN(
+        parsedDate.getTime()
+      )
+    ) {
+      return '';
+    }
+
+    return parsedDate
+      .toISOString()
+      .slice(0, 10);
+  };
+
+
+  // ==========================================================
   // TASLAK DÜZENLE
   // ==========================================================
 
-  const formatDateForInput = (date) => {
-  if (!date) return '';
-
-  const parsedDate = new Date(date);
-
-  if (Number.isNaN(parsedDate.getTime())) {
-    return '';
-  }
-
-  return parsedDate.toISOString().slice(0, 10);
-  };
-
   const editDraft = (letter) => {
-
-    // Veritabanından gelen mektup bilgilerini
-    // forma dolduruyoruz.
-    //
-    // || '' kullanarak null/undefined değerlerin
-    // input'u bozmasını engelliyoruz.
     setForm({
       branch:
         letter.branch || '',
@@ -1132,12 +874,12 @@ function App() {
         letter.currency || 'TRY',
 
       amount:
-        letter.amount || '',
+        letter.amount ?? '',
 
       issueDate:
         formatDateForInput(
-              letter.issueDate
-        ),  
+          letter.issueDate
+        ),
 
       expiryDate:
         formatDateForInput(
@@ -1157,22 +899,16 @@ function App() {
         letter.notes || '',
     });
 
-
-    // Artık bu ID'li taslağı düzenliyoruz.
     setEditingDraftId(
       letter.id
     );
 
-
     setErrors({});
-
 
     setNotice(
       'Taslak düzenleme modunda. Değişikliklerinizi yaptıktan sonra "Onaya Gönder" butonuna basabilirsiniz.'
     );
 
-
-    // Kullanıcıyı sayfanın en üstüne götür.
     window.scrollTo({
       top: 0,
       behavior: 'smooth',
@@ -1184,20 +920,13 @@ function App() {
   // LOGIN
   // ==========================================================
 
-  const login = async (
-    event
-  ) => {
-
-    // Form submit olduğunda sayfanın yenilenmesini engelle.
+  const login = async (event) => {
     event.preventDefault();
 
-    // Önceki login hatasını temizle.
     setLoginError('');
-
+    setIsLoggingIn(true);
 
     try {
-
-      // Backend'in login endpoint'ine POST isteği gönderiyoruz.
       const response =
         await fetch(
           '/api/auth/login',
@@ -1209,20 +938,15 @@ function App() {
                 'application/json',
             },
 
-            // Kullanıcı adı ve parolayı JSON olarak gönder.
             body: JSON.stringify(
               loginData
             ),
           }
         );
 
-
-      // Backend'in JSON cevabını oku.
       const result =
         await response.json();
 
-
-      // HTTP response başarısızsa hata oluştur.
       if (!response.ok) {
         throw new Error(
           result.message ||
@@ -1230,32 +954,31 @@ function App() {
         );
       }
 
-
-      // Backend'in verdiği session token'ı
-      // tarayıcının localStorage alanına kaydet.
       localStorage.setItem(
         'letterSessionToken',
         result.token
       );
 
-
-      // React state'ini de güncelle.
       setSessionToken(
         result.token
       );
 
-
-      // Login olan kullanıcıyı state'e kaydet.
       setUser(result.user);
 
+      setLoginData({
+        username: '',
+        password: '',
+      });
 
     } catch (error) {
 
-      // Login sırasında hata oluşursa ekranda göster.
       setLoginError(
         error.message ||
           'Giriş yapılamadı.'
       );
+
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -1265,40 +988,36 @@ function App() {
   // ==========================================================
 
   const logout = async () => {
-
     try {
-
-      // Backend'e logout isteği gönder.
       await apiFetch(
         '/api/auth/logout',
         {
           method: 'POST',
         }
       );
-
     } catch {
-
-      // Backend kapalı olsa bile frontend'deki
-      // session'ı temizlemeye devam ediyoruz.
+      // Frontend yine temizlenir.
     }
 
-
-    // Token'ı tarayıcıdan sil.
     localStorage.removeItem(
       'letterSessionToken'
     );
 
-
-    // React state'lerini temizle.
     setSessionToken(null);
 
     setUser(null);
 
     setLetters([]);
 
-    setForm(emptyForm);
+    setForm({
+      ...emptyForm,
+    });
 
     setEditingDraftId(null);
+
+    setErrors({});
+
+    setNotice('');
   };
 
 
@@ -1310,15 +1029,9 @@ function App() {
     letter,
     status
   ) => {
-
     let rejectionReason = '';
 
-
-    // Eğer işlem RED ise kullanıcıdan neden istiyoruz.
-    if (
-      status === 'REJECTED'
-    ) {
-
+    if (status === 'REJECTED') {
       rejectionReason =
         window
           .prompt(
@@ -1326,10 +1039,7 @@ function App() {
           )
           ?.trim() || '';
 
-
-      // Kullanıcı neden girmediyse işlemi durdur.
       if (!rejectionReason) {
-
         setNotice(
           'Red işlemi için bir neden girmeniz gerekir.'
         );
@@ -1338,13 +1048,7 @@ function App() {
       }
     }
 
-
     try {
-
-      // Backend'e PATCH isteği gönderiyoruz.
-      //
-      // PATCH:
-      // Var olan kaydın belirli alanlarını güncellemek için kullanılır.
       const response =
         await apiFetch(
           `/api/letters/${letter.id}`,
@@ -1363,10 +1067,8 @@ function App() {
           }
         );
 
-
       const result =
         await response.json();
-
 
       if (!response.ok) {
         throw new Error(
@@ -1375,30 +1077,21 @@ function App() {
         );
       }
 
-
-      // Güncellenmiş kaydı frontend listesinde de güncelle.
-      setLetters(
-        (current) =>
-          current.map(
-            (item) =>
-              item.id ===
-              result.id
-                ? result
-                : item
-          )
+      setLetters((current) =>
+        current.map((item) =>
+          item.id === result.id
+            ? result
+            : item
+        )
       );
 
-
-      // İşlem sonucunu kullanıcıya göster.
       setNotice(
         status === 'APPROVED'
           ? 'Mektup başarıyla onaylandı.'
           : 'Mektup reddedildi.'
       );
 
-
     } catch (error) {
-
       setNotice(
         error.message ||
           'Durum güncellenemedi.'
@@ -1414,21 +1107,16 @@ function App() {
   const deleteLetter = async (
     letter
   ) => {
-
-    // Önce kullanıcıdan silme onayı al.
     const confirmed =
       window.confirm(
         `${letter.customerName || 'Bu kayıt'} kaydını silmek istediğinize emin misiniz?`
       );
 
-
-    // Kullanıcı "Hayır" derse hiçbir şey yapma.
-    if (!confirmed) return;
-
+    if (!confirmed) {
+      return;
+    }
 
     try {
-
-      // Backend'e DELETE isteği gönder.
       const response =
         await apiFetch(
           `/api/letters/${letter.id}`,
@@ -1437,9 +1125,7 @@ function App() {
           }
         );
 
-
       if (!response.ok) {
-
         const result =
           await response.json();
 
@@ -1449,25 +1135,18 @@ function App() {
         );
       }
 
-
-      // Başarıyla silinen kaydı frontend listesinden de çıkar.
-      setLetters(
-        (current) =>
-          current.filter(
-            (item) =>
-              item.id !==
-              letter.id
-          )
+      setLetters((current) =>
+        current.filter(
+          (item) =>
+            item.id !== letter.id
+        )
       );
-
 
       setNotice(
         'Mektup kaydı silindi.'
       );
 
-
     } catch (error) {
-
       setNotice(
         error.message ||
           'Kayıt silinemedi.'
@@ -1477,19 +1156,15 @@ function App() {
 
 
   // ==========================================================
-  // ROL BAZLI YETKİLER
+  // ROL YETKİLERİ
   // ==========================================================
 
-  // BRANCH ve ADMIN kullanıcıları mektup oluşturabilir.
   const canCreate =
     user &&
     ['BRANCH', 'ADMIN'].includes(
       user.role
     );
 
-
-  // AUTHORIZED ve ADMIN kullanıcıları
-  // onay/reddetme işlemi yapabilir.
   const canReview =
     user &&
     ['AUTHORIZED', 'ADMIN'].includes(
@@ -1498,23 +1173,23 @@ function App() {
 
 
   // ==========================================================
-  // AUTH LOADING
+  // LOADING
   // ==========================================================
 
-  // Uygulama açıldığında session kontrol edilirken
-  // kullanıcıya loading ekranı gösteriyoruz.
   if (authLoading) {
-
     return (
       <div className="login-page">
 
         <div className="loading-card">
 
+          <div className="loading-logo">
+            A
+          </div>
+
           <div className="loading-spinner" />
 
           <p>
-            Oturum kontrol
-            ediliyor…
+            Oturum kontrol ediliyor…
           </p>
 
         </div>
@@ -1525,25 +1200,17 @@ function App() {
 
 
   // ==========================================================
-  // LOGIN SCREEN
+  // LOGIN
   // ==========================================================
 
-  // Kullanıcı login değilse ana uygulamayı gösterme.
-  //
-  // Bunun yerine LoginScreen component'ini göster.
   if (!user) {
-
     return (
       <LoginScreen
         loginData={loginData}
-
-        setLoginData={
-          setLoginData
-        }
-
+        setLoginData={setLoginData}
         login={login}
-
         loginError={loginError}
+        isLoggingIn={isLoggingIn}
       />
     );
   }
@@ -1553,97 +1220,142 @@ function App() {
   // ANA UYGULAMA
   // ==========================================================
 
-  // Buraya geldiysek kullanıcı login olmuştur.
   return (
     <div className="app-shell">
 
-      {/* ----------------------------------------------------
-          ÜST MENÜ / HEADER
-          ---------------------------------------------------- */}
+      {/* ==================================================
+          TOPBAR
+          ================================================== */}
 
       <header className="topbar">
 
-        <div className="brand-mark">
-          B
+        <div className="brand-area">
+
+          <div className="brand-logo">
+            A
+          </div>
+
+          <div>
+
+            <div className="brand-name">
+              Ayşe Bank
+            </div>
+
+            <div className="brand-subtitle">
+              Kurumsal Mektup Yönetimi
+            </div>
+
+          </div>
+
         </div>
 
 
-        <div>
+        {/* Mobil marka */}
 
-          <p className="eyebrow">
-            KURUMSAL BANKACILIK
-          </p>
+        <div className="mobile-brand">
 
-          <h1>
-            Mektup Giriş
-            İşlemleri
-          </h1>
+          <div className="mobile-logo">
+            A
+          </div>
+
+          <div>
+
+            <div className="mobile-brand-name">
+              Ayşe Bank
+            </div>
+
+            <div className="mobile-brand-subtitle">
+              Kurumsal Mektup Yönetimi
+            </div>
+
+          </div>
 
         </div>
 
 
-        {/* Kullanıcı bilgileri ve çıkış butonu */}
-        <div className="user-chip">
+        <div className="topbar-right">
 
-          <span className="user-dot">
-            {user.fullName.charAt(0)}
-          </span>
+          <div className="topbar-secure">
 
-          <span>
-            {user.fullName} ·{' '}
-            {user.roleLabel}
-          </span>
+            <span className="secure-dot" />
+
+            Güvenli oturum
+
+          </div>
 
 
-          <button
-            type="button"
-            className="logout-button"
-            onClick={logout}
-          >
-            Çıkış
-          </button>
+          <div className="user-chip">
+
+            <span className="user-avatar">
+              {user.fullName
+                ?.charAt(0)
+                .toUpperCase() || 'A'}
+            </span>
+
+            <div className="topbar-user-info">
+
+              <strong>
+                {user.fullName}
+              </strong>
+
+              <span>
+                {user.roleLabel}
+              </span>
+
+            </div>
+
+            <button
+              type="button"
+              className="logout-button"
+              onClick={logout}
+            >
+              Çıkış
+            </button>
+
+          </div>
 
         </div>
 
       </header>
 
 
-      <main>
+      <main className="main-content">
 
-        {/* --------------------------------------------------
-            SAYFA BAŞLIĞI
-            -------------------------------------------------- */}
+        {/* ==================================================
+            INTRO
+            ================================================== */}
 
         <section className="intro">
 
           <div>
 
+            <div className="welcome-line">
+              Günaydın,{' '}
+              {user.fullName
+                ?.split(' ')[0] || 'Kullanıcı'}{' '}
+              👋🏻
+            </div>
+
             <p className="eyebrow blue">
               MEKTUP YÖNETİMİ
             </p>
 
-
-            <h2>
+            <h1>
 
               {editingDraftId
                 ? 'Taslağı düzenleyin'
-
                 : canCreate
                 ? 'Mektup bilgilerini oluşturun'
-
                 : 'Mektupları inceleyin'}
 
-            </h2>
-
+            </h1>
 
             <p className="intro-description">
 
               {editingDraftId
                 ? 'Taslak üzerindeki bilgileri düzenleyip onaya gönderebilirsiniz.'
-
                 : canCreate
                 ? 'Yeni mektup kaydı oluşturun. İsterseniz taslak olarak kaydedebilir, tamamladığınızda onaya gönderebilirsiniz.'
-
                 : 'Onay bekleyen mektupları inceleyebilir, onaylayabilir veya reddedebilirsiniz.'}
 
             </p>
@@ -1652,17 +1364,75 @@ function App() {
 
 
           <div className="secure-badge">
-            ✓ Güvenli işlem ekranı
+
+            <span>
+              ✓
+            </span>
+
+            Güvenli işlem ekranı
+
           </div>
 
         </section>
 
 
         {/* ==================================================
-            MEKTUP OLUŞTURMA FORMU
+            STATS
+            ================================================== */}
 
-            canCreate true ise sadece BRANCH ve ADMIN
-            kullanıcılarına gösterilir.
+        <section className="stats-grid">
+
+          <StatCard
+            icon="✉"
+            label="Toplam mektup"
+            value={letters.length}
+            type="purple"
+          />
+
+          <StatCard
+            icon="◷"
+            label="Onay bekleyen"
+            value={
+              letters.filter(
+                (letter) =>
+                  letter.status ===
+                  'PENDING'
+              ).length
+            }
+            type="orange"
+          />
+
+          <StatCard
+            icon="✓"
+            label="Onaylanan"
+            value={
+              letters.filter(
+                (letter) =>
+                  letter.status ===
+                  'APPROVED'
+              ).length
+            }
+            type="green"
+          />
+
+          <StatCard
+            icon="◫"
+            label="Taslak"
+            value={
+              letters.filter(
+                (letter) =>
+                  letter.status ===
+                  'DRAFT'
+              ).length
+            }
+            type="pink"
+          />
+
+        </section>
+
+
+        {/* ==================================================
+            FORM
             ================================================== */}
 
         {canCreate && (
@@ -1677,39 +1447,42 @@ function App() {
             noValidate
           >
 
-            {/* Taslak düzenleniyorsa bilgi banner'ı */}
             {editingDraftId && (
 
               <div className="editing-banner">
 
-                <strong>
-                  Taslak düzenleniyor
-                </strong>
+                <div className="editing-banner-icon">
+                  ✎
+                </div>
 
-                <span>
-                  Bu kayıt üzerinde yaptığınız değişiklikler "Onaya Gönder" seçeneğiyle PENDING durumuna geçecektir.
-                </span>
+                <div>
 
+                  <strong>
+                    Taslak düzenleniyor
+                  </strong>
+
+                  <span>
+                    Bu kayıt üzerinde yaptığınız değişiklikler "Onaya Gönder" seçeneğiyle PENDING durumuna geçecektir.
+                  </span>
+
+                </div>
 
                 <button
                   type="button"
-                  onClick={
-                    clearForm
-                  }
+                  onClick={clearForm}
+                  disabled={isSaving}
                 >
                   Düzenlemeyi iptal et
                 </button>
 
               </div>
+
             )}
 
 
             <section className="form-card">
 
-
-              {/* ============================================
-                  KURAL UYARILARI
-                  ============================================ */}
+              {/* UYARILAR */}
 
               {ruleAlerts.length > 0 && (
 
@@ -1719,10 +1492,7 @@ function App() {
                 >
 
                   {ruleAlerts.map(
-                    (
-                      alert,
-                      index
-                    ) => (
+                    (alert, index) => (
 
                       <div
                         className={`rule-alert ${alert.type}`}
@@ -1730,25 +1500,22 @@ function App() {
                       >
 
                         <span>
-                          {alert.type ===
-                          'info'
-                            ? 'i'
-                            : '!'}
+                          !
                         </span>
 
                         {alert.text}
 
                       </div>
+
                     )
                   )}
 
                 </div>
+
               )}
 
 
-              {/* ============================================
-                  MÜŞTERİ BİLGİLERİ
-                  ============================================ */}
+              {/* MÜŞTERİ */}
 
               <FormSection
                 title="Müşteri ve işlem bilgileri"
@@ -1758,24 +1525,16 @@ function App() {
                 <Field
                   label="İşlem şubesi"
                   name="branch"
-                  value={
-                    form.branch
-                  }
+                  value={form.branch}
                   onChange={update}
-                  error={
-                    errors.branch
-                  }
+                  error={errors.branch}
                   required
                 >
 
                   <select
                     name="branch"
-                    value={
-                      form.branch
-                    }
-                    onChange={
-                      update
-                    }
+                    value={form.branch}
+                    onChange={update}
                   >
 
                     <option value="">
@@ -1806,13 +1565,9 @@ function App() {
                 <Field
                   label="Müşteri ad soyad / ticari unvan"
                   name="customerName"
-                  value={
-                    form.customerName
-                  }
+                  value={form.customerName}
                   onChange={update}
-                  error={
-                    errors.customerName
-                  }
+                  error={errors.customerName}
                   required
                   placeholder="Örn. Aydın Yapı San. ve Tic. A.Ş."
                 />
@@ -1821,9 +1576,7 @@ function App() {
                 <Field
                   label="Müşteri unvanı"
                   name="title"
-                  value={
-                    form.title
-                  }
+                  value={form.title}
                   onChange={update}
                   placeholder="Örn. Genel Müdür"
                 />
@@ -1832,9 +1585,7 @@ function App() {
                 <Field
                   label="Müşteri referans numarası"
                   name="referenceNo"
-                  value={
-                    form.referenceNo
-                  }
+                  value={form.referenceNo}
                   onChange={update}
                   placeholder="Örn. 1234567890"
                 />
@@ -1842,9 +1593,7 @@ function App() {
               </FormSection>
 
 
-              {/* ============================================
-                  İHALE BİLGİLERİ
-                  ============================================ */}
+              {/* İHALE */}
 
               <FormSection
                 title="Mektup ve ihale bilgileri"
@@ -1854,24 +1603,16 @@ function App() {
                 <Field
                   label="Mektup kapsamı"
                   name="letterScope"
-                  value={
-                    form.letterScope
-                  }
+                  value={form.letterScope}
                   onChange={update}
-                  error={
-                    errors.letterScope
-                  }
+                  error={errors.letterScope}
                   required
                 >
 
                   <select
                     name="letterScope"
-                    value={
-                      form.letterScope
-                    }
-                    onChange={
-                      update
-                    }
+                    value={form.letterScope}
+                    onChange={update}
                   >
 
                     <option value="">
@@ -1906,20 +1647,15 @@ function App() {
                 <Field
                   label="Mektup lisansı / türü"
                   name="letterLicense"
-                  value={
-                    form.letterLicense
-                  }
+                  value={form.letterLicense}
                   onChange={update}
+                  error={errors.letterLicense}
                 >
 
                   <select
                     name="letterLicense"
-                    value={
-                      form.letterLicense
-                    }
-                    onChange={
-                      update
-                    }
+                    value={form.letterLicense}
+                    onChange={update}
                   >
 
                     <option value="">
@@ -1946,24 +1682,16 @@ function App() {
                 <Field
                   label="İhale tipi"
                   name="tenderType"
-                  value={
-                    form.tenderType
-                  }
+                  value={form.tenderType}
                   onChange={update}
-                  error={
-                    errors.tenderType
-                  }
+                  error={errors.tenderType}
                   required
                 >
 
                   <select
                     name="tenderType"
-                    value={
-                      form.tenderType
-                    }
-                    onChange={
-                      update
-                    }
+                    value={form.tenderType}
+                    onChange={update}
                   >
 
                     <option value="">
@@ -1994,13 +1722,9 @@ function App() {
                 <Field
                   label="İhalenin adı"
                   name="tenderName"
-                  value={
-                    form.tenderName
-                  }
+                  value={form.tenderName}
                   onChange={update}
-                  error={
-                    errors.tenderName
-                  }
+                  error={errors.tenderName}
                   required
                   placeholder="İhale / proje adı"
                 />
@@ -2009,13 +1733,9 @@ function App() {
                 <Field
                   label="Muhatabın adı"
                   name="recipient"
-                  value={
-                    form.recipient
-                  }
+                  value={form.recipient}
                   onChange={update}
-                  error={
-                    errors.recipient
-                  }
+                  error={errors.recipient}
                   required
                   placeholder="Kurum veya şirket adı"
                 />
@@ -2024,9 +1744,7 @@ function App() {
                 <Field
                   label="Proje / ihale numarası"
                   name="projectNo"
-                  value={
-                    form.projectNo
-                  }
+                  value={form.projectNo}
                   onChange={update}
                   placeholder="Varsa girin"
                 />
@@ -2034,9 +1752,7 @@ function App() {
               </FormSection>
 
 
-              {/* ============================================
-                  TUTAR VE TARİHLER
-                  ============================================ */}
+              {/* TUTAR */}
 
               <FormSection
                 title="Tutar ve geçerlilik"
@@ -2046,13 +1762,9 @@ function App() {
                 <Field
                   label="Mektup tutarı"
                   name="amount"
-                  value={
-                    form.amount
-                  }
+                  value={form.amount}
                   onChange={update}
-                  error={
-                    errors.amount
-                  }
+                  error={errors.amount}
                   required
                   type="number"
                   min="0"
@@ -2068,20 +1780,15 @@ function App() {
                 <Field
                   label="Para birimi"
                   name="currency"
-                  value={
-                    form.currency
-                  }
+                  value={form.currency}
                   onChange={update}
+                  error={errors.currency}
                 >
 
                   <select
                     name="currency"
-                    value={
-                      form.currency
-                    }
-                    onChange={
-                      update
-                    }
+                    value={form.currency}
+                    onChange={update}
                   >
 
                     <option>
@@ -2108,13 +1815,9 @@ function App() {
                 <Field
                   label="Düzenleme tarihi"
                   name="issueDate"
-                  value={
-                    form.issueDate
-                  }
+                  value={form.issueDate}
                   onChange={update}
-                  error={
-                    errors.issueDate
-                  }
+                  error={errors.issueDate}
                   required
                   type="date"
                   max={today}
@@ -2124,13 +1827,9 @@ function App() {
                 <Field
                   label="Geçerlilik tarihi"
                   name="expiryDate"
-                  value={
-                    form.expiryDate
-                  }
+                  value={form.expiryDate}
                   onChange={update}
-                  error={
-                    errors.expiryDate
-                  }
+                  error={errors.expiryDate}
                   type="date"
                   min={
                     form.issueDate ||
@@ -2141,9 +1840,7 @@ function App() {
               </FormSection>
 
 
-              {/* ============================================
-                  YETKİLİ VE EK BİLGİLER
-                  ============================================ */}
+              {/* YETKİLİ */}
 
               <FormSection
                 title="Yetkili ve ek bilgiler"
@@ -2153,9 +1850,7 @@ function App() {
                 <Field
                   label="Yetkili adı soyadı"
                   name="authorityName"
-                  value={
-                    form.authorityName
-                  }
+                  value={form.authorityName}
                   onChange={update}
                   placeholder="Talep yetkilisi"
                 />
@@ -2164,9 +1859,7 @@ function App() {
                 <Field
                   label="Yetkili telefon"
                   name="authorityPhone"
-                  value={
-                    form.authorityPhone
-                  }
+                  value={form.authorityPhone}
                   onChange={update}
                   type="tel"
                   placeholder="05XX XXX XX XX"
@@ -2176,13 +1869,9 @@ function App() {
                 <Field
                   label="Yetkili e-posta"
                   name="authorityEmail"
-                  value={
-                    form.authorityEmail
-                  }
+                  value={form.authorityEmail}
                   onChange={update}
-                  error={
-                    errors.authorityEmail
-                  }
+                  error={errors.authorityEmail}
                   type="email"
                   placeholder="ornek@firma.com"
                 />
@@ -2191,9 +1880,7 @@ function App() {
                 <Field
                   label="Muhatap adresi"
                   name="address"
-                  value={
-                    form.address
-                  }
+                  value={form.address}
                   onChange={update}
                   className="span-2"
                   placeholder="Açık adres (varsa)"
@@ -2203,21 +1890,15 @@ function App() {
                 <Field
                   label="Açıklama / özel not"
                   name="notes"
-                  value={
-                    form.notes
-                  }
+                  value={form.notes}
                   onChange={update}
                   className="span-2"
                 >
 
                   <textarea
                     name="notes"
-                    value={
-                      form.notes
-                    }
-                    onChange={
-                      update
-                    }
+                    value={form.notes}
+                    onChange={update}
                     rows="3"
                     placeholder="Mektup için ek notlarınızı girin"
                   />
@@ -2229,14 +1910,14 @@ function App() {
             </section>
 
 
-            {/* Kullanıcıya bilgi / hata mesajı */}
+            {/* NOTICE */}
+
             {notice && (
 
               <p
                 className={
-                  Object.keys(
-                    errors
-                  ).length
+                  Object.keys(errors)
+                    .length
                     ? 'notice warning'
                     : 'notice'
                 }
@@ -2244,32 +1925,24 @@ function App() {
               >
                 {notice}
               </p>
+
             )}
 
 
-            {/* ============================================
-                FORM BUTONLARI
-                ============================================ */}
+            {/* BUTONLAR */}
 
             <div className="actions">
 
-              {/* Formu temizleme */}
               <button
                 type="button"
                 className="button secondary"
-                onClick={
-                  clearForm
-                }
-                disabled={
-                  isSaving
-                }
+                onClick={clearForm}
+                disabled={isSaving}
               >
                 Temizle
               </button>
 
 
-              {/* Yeni kayıt oluşturuluyorsa
-                  Taslak Kaydet butonu göster */}
               {!editingDraftId && (
 
                 <button
@@ -2281,26 +1954,20 @@ function App() {
                       'DRAFT'
                     )
                   }
-                  disabled={
-                    isSaving
-                  }
+                  disabled={isSaving}
                 >
-
                   {isSaving
                     ? 'Kaydediliyor…'
                     : 'Taslak Kaydet'}
-
                 </button>
+
               )}
 
 
-              {/* Ana submit butonu */}
               <button
                 type="submit"
                 className="button primary"
-                disabled={
-                  isSaving
-                }
+                disabled={isSaving}
               >
 
                 {isSaving
@@ -2308,7 +1975,6 @@ function App() {
                   : editingDraftId
                   ? 'Onaya Gönder'
                   : 'Kaydet ve Onaya Gönder'}
-
 
                 {!isSaving && (
                   <span>
@@ -2321,43 +1987,44 @@ function App() {
             </div>
 
           </form>
+
         )}
 
 
         {/* ==================================================
-            YETKİLİ KULLANICI EKRANI
+            YETKİLİ MESAJI
             ================================================== */}
 
-        {!canCreate &&
-          canReview && (
+        {!canCreate && canReview && (
 
-            <section className="role-message">
+          <section className="role-message">
 
-              <div className="role-message-icon">
-                ✓
-              </div>
+            <div className="role-message-icon">
+              ✓
+            </div>
 
-              <div>
+            <div>
 
-                <h2>
-                  Onay ve inceleme
-                  ekranı
-                </h2>
+              <p className="eyebrow blue">
+                YETKİLİ İŞLEMLERİ
+              </p>
 
-                <p>
-                  Aşağıdaki listeden
-                  onay bekleyen
-                  mektupları
-                  inceleyebilir,
-                  onaylayabilir
-                  veya
-                  reddedebilirsiniz.
-                </p>
+              <h2>
+                Onay ve inceleme ekranı
+              </h2>
 
-              </div>
+              <p>
+                Aşağıdaki listeden onay
+                bekleyen mektupları
+                inceleyebilir, onaylayabilir
+                veya reddedebilirsiniz.
+              </p>
 
-            </section>
-          )}
+            </div>
+
+          </section>
+
+        )}
 
 
         {/* ==================================================
@@ -2375,46 +2042,44 @@ function App() {
               </p>
 
               <h2>
-                Kaydedilen
-                mektuplar
+                Kaydedilen mektuplar
               </h2>
+
+              <p className="list-description">
+                Sistemdeki tüm mektup kayıtlarını
+                buradan takip edebilirsiniz.
+              </p>
 
             </div>
 
-
-            {/* Toplam kayıt sayısı */}
             <span className="count">
-              {letters.length}{' '}
-              kayıt
+              {letters.length} kayıt
             </span>
 
           </div>
 
 
-          {/* Hiç kayıt yoksa boş ekran */}
           {letters.length === 0 ? (
 
             <div className="empty-state">
 
-              <div>▤</div>
+              <div className="empty-icon">
+                ✉
+              </div>
 
               <h3>
-                Henüz kayıt
-                bulunmuyor
+                Henüz kayıt bulunmuyor
               </h3>
 
               <p>
-                Mektup kaydı
-                oluşturulduğunda
-                burada
-                görüntülenecektir.
+                Mektup kaydı oluşturulduğunda
+                burada görüntülenecektir.
               </p>
 
             </div>
 
           ) : (
 
-            /* Kayıt varsa tablo */
             <div className="table-wrap">
 
               <table>
@@ -2447,9 +2112,6 @@ function App() {
                       Durum
                     </th>
 
-
-                    {/* İşlem sütununu sadece
-                        yetkili/admin veya şube kullanıcılarına göster */}
                     {(canReview ||
                       user.role ===
                         'BRANCH') && (
@@ -2457,6 +2119,7 @@ function App() {
                       <th>
                         İşlem
                       </th>
+
                     )}
 
                   </tr>
@@ -2466,20 +2129,20 @@ function App() {
 
                 <tbody>
 
-                  {/* letters dizisindeki her kayıt için
-                      bir tablo satırı oluştur */}
                   {letters.map(
                     (letter) => (
 
                       <tr
-                        key={
-                          letter.id
-                        }
+                        key={letter.id}
                       >
 
                         <td>
-                          {letter.referenceNo ||
-                            '—'}
+
+                          <span className="reference-cell">
+                            {letter.referenceNo ||
+                              '—'}
+                          </span>
+
                         </td>
 
 
@@ -2491,9 +2154,8 @@ function App() {
                           </strong>
 
                           <small>
-                            {
-                              letter.branch
-                            }
+                            {letter.branch ||
+                              '—'}
                           </small>
 
                         </td>
@@ -2518,47 +2180,56 @@ function App() {
                         </td>
 
 
-                        {/* Tutarı Türkçe sayı formatında göster */}
                         <td>
 
-                          {letter.amount
-                            ? Number(
-                                letter.amount
-                              ).toLocaleString(
-                                'tr-TR',
-                                {
-                                  minimumFractionDigits:
-                                    2,
-                                }
-                              )
-                            : '—'}{' '}
+                          <strong className="amount-cell">
 
-                          {
-                            letter.currency
-                          }
+                            {letter.amount !==
+                            null &&
+                            letter.amount !==
+                            undefined &&
+                            letter.amount !== ''
+                              ? Number(
+                                  letter.amount
+                                ).toLocaleString(
+                                  'tr-TR',
+                                  {
+                                    minimumFractionDigits:
+                                      2,
+                                  }
+                                )
+                              : '—'}
+
+                            {' '}
+
+                            {letter.currency ||
+                              ''}
+
+                          </strong>
 
                         </td>
 
 
-                        {/* Durum */}
                         <td>
 
                           <span
-                            className={`status status-${letter.status.toLowerCase()}`}
+                            className={`status status-${(
+                              letter.status ||
+                              ''
+                            ).toLowerCase()}`}
                           >
 
-                            {
-                              statusLabels[
-                                letter.status
-                              ] ||
-                                letter.status
-                            }
+                            <span className="status-dot" />
+
+                            {statusLabels[
+                              letter.status
+                            ] ||
+                              letter.status ||
+                              'Bilinmiyor'}
 
                           </span>
 
 
-                          {/* Eğer mektup reddedilmişse
-                              red nedenini göster */}
                           {letter.status ===
                             'REJECTED' &&
                             letter.rejectionReason && (
@@ -2572,12 +2243,12 @@ function App() {
                                 }
 
                               </small>
+
                             )}
 
                         </td>
 
 
-                        {/* İşlem butonları */}
                         {(canReview ||
                           user.role ===
                             'BRANCH') && (
@@ -2586,68 +2257,61 @@ function App() {
 
                             <div className="review-actions">
 
-
-                              {/* Şube kullanıcısı sadece
-                                  DRAFT kayıtlarını düzenleyebilir */}
                               {user.role ===
                                 'BRANCH' &&
                                 letter.status ===
                                   'DRAFT' && (
 
-                                  <button
-                                    type="button"
-                                    className="edit-button"
-                                    onClick={() =>
-                                      editDraft(
-                                        letter
-                                      )
-                                    }
-                                  >
-                                    Düzenle
-                                  </button>
-                                )}
+                                <button
+                                  type="button"
+                                  className="edit-button"
+                                  onClick={() =>
+                                    editDraft(
+                                      letter
+                                    )
+                                  }
+                                >
+                                  Düzenle
+                                </button>
+
+                              )}
 
 
-                              {/* Yetkili kullanıcı
-                                  PENDING kayıtlarını onaylayabilir/reddedebilir */}
                               {canReview &&
                                 letter.status ===
                                   'PENDING' && (
 
-                                  <>
+                                <>
+                                  <button
+                                    type="button"
+                                    className="approve-button"
+                                    onClick={() =>
+                                      updateStatus(
+                                        letter,
+                                        'APPROVED'
+                                      )
+                                    }
+                                  >
+                                    Onayla
+                                  </button>
 
-                                    <button
-                                      type="button"
-                                      className="approve-button"
-                                      onClick={() =>
-                                        updateStatus(
-                                          letter,
-                                          'APPROVED'
-                                        )
-                                      }
-                                    >
-                                      Onayla
-                                    </button>
+                                  <button
+                                    type="button"
+                                    className="reject-button"
+                                    onClick={() =>
+                                      updateStatus(
+                                        letter,
+                                        'REJECTED'
+                                      )
+                                    }
+                                  >
+                                    Reddet
+                                  </button>
+                                </>
 
-
-                                    <button
-                                      type="button"
-                                      className="reject-button"
-                                      onClick={() =>
-                                        updateStatus(
-                                          letter,
-                                          'REJECTED'
-                                        )
-                                      }
-                                    >
-                                      Reddet
-                                    </button>
-
-                                  </>
-                                )}
+                              )}
 
 
-                              {/* ADMIN bütün kayıtları silebilir */}
                               {user.role ===
                                 'ADMIN' && (
 
@@ -2662,14 +2326,17 @@ function App() {
                                 >
                                   Sil
                                 </button>
+
                               )}
 
                             </div>
 
                           </td>
+
                         )}
 
                       </tr>
+
                     )
                   )}
 
@@ -2678,9 +2345,23 @@ function App() {
               </table>
 
             </div>
+
           )}
 
         </section>
+
+
+        <footer className="page-footer">
+
+          <span>
+            © 2026 Ayşe Bank
+          </span>
+
+          <span>
+            Kurumsal Mektup Yönetim Sistemi
+          </span>
+
+        </footer>
 
       </main>
 
@@ -2690,48 +2371,33 @@ function App() {
 
 
 // ============================================================
-// FORM SECTION COMPONENT
+// STAT CARD
 // ============================================================
 
-// Formdaki bölümleri tekrar tekrar yazmak yerine
-// tek bir reusable component oluşturuyoruz.
-//
-// Örneğin:
-//
-// <FormSection
-//   title="Müşteri bilgileri"
-//   subtitle="..."
-// >
-//   ...
-// </FormSection>
-//
-// children -> component'in açılış/kapanış etiketi arasındaki içeriktir.
-function FormSection({
-  title,
-  subtitle,
-  children,
+function StatCard({
+  icon,
+  label,
+  value,
+  type,
 }) {
-
   return (
+    <div className="stat-card">
 
-    <div className="form-section">
-
-      <div className="section-title">
-
-        <h3>
-          {title}
-        </h3>
-
-        <p>
-          {subtitle}
-        </p>
-
+      <div
+        className={`stat-icon ${type}`}
+      >
+        {icon}
       </div>
 
+      <div>
 
-      <div className="fields">
+        <span className="stat-label">
+          {label}
+        </span>
 
-        {children}
+        <strong>
+          {value}
+        </strong>
 
       </div>
 
@@ -2741,14 +2407,51 @@ function FormSection({
 
 
 // ============================================================
-// FIELD COMPONENT
+// FORM SECTION
 // ============================================================
 
-// Input alanlarını standartlaştırmak için oluşturduğumuz
-// reusable component.
-//
-// Böylece her input için label, error, placeholder,
-// required gibi şeyleri tekrar tekrar yazmamıza gerek kalmaz.
+function FormSection({
+  title,
+  subtitle,
+  children,
+}) {
+  return (
+    <div className="form-section">
+
+      <div className="section-title">
+
+        <div className="section-number">
+          ✓
+        </div>
+
+        <div>
+
+          <h3>
+            {title}
+          </h3>
+
+          <p>
+            {subtitle}
+          </p>
+
+        </div>
+
+      </div>
+
+
+      <div className="fields">
+        {children}
+      </div>
+
+    </div>
+  );
+}
+
+
+// ============================================================
+// FIELD
+// ============================================================
+
 function Field({
   label,
   name,
@@ -2763,65 +2466,52 @@ function Field({
   inputClassName = '',
   ...props
 }) {
-
   return (
-
     <label
       className={`field ${className}`}
     >
 
-      {/* Input'un başlığı */}
-      <span>
+      <span className="field-label">
 
         {label}
 
-        {/* required true ise * göster */}
         {required && (
-          <b> *</b>
+          <b>
+            *
+          </b>
         )}
 
       </span>
 
 
-      {/* 
-        children varsa onu kullan.
+      {children ? (
 
-        Örneğin select veya textarea gönderdiğimizde
-        children kullanılır.
+        React.cloneElement(
+          children,
+          {
+            'aria-invalid':
+              Boolean(error),
 
-        children yoksa normal <input> oluşturulur.
-      */}
-      {children || (
+            ...children.props,
+          }
+        )
+
+      ) : (
 
         <input
-          className={
-            inputClassName
-          }
-
+          className={inputClassName}
           type={type}
-
           name={name}
-
           value={value}
-
           onChange={onChange}
-
-          placeholder={
-            placeholder
-          }
-
-          // Hata varsa accessibility için
-          // aria-invalid=true gönder.
-          aria-invalid={Boolean(
-            error
-          )}
-
+          placeholder={placeholder}
+          aria-invalid={Boolean(error)}
           {...props}
         />
+
       )}
 
 
-      {/* Validation hatası varsa göster */}
       {error && (
         <em>
           {error}
@@ -2834,151 +2524,193 @@ function Field({
 
 
 // ============================================================
-// LOGIN SCREEN COMPONENT
+// LOGIN SCREEN
 // ============================================================
 
-// Login ekranını ayrı bir component olarak oluşturuyoruz.
 function LoginScreen({
   loginData,
   setLoginData,
   login,
   loginError,
+  isLoggingIn,
 }) {
-
-
-  // Login formundaki input değişikliklerini yönetir.
   const updateLogin = (
     event
   ) => {
+    setLoginData((current) => ({
+      ...current,
 
-    setLoginData(
-      (current) => ({
-        ...current,
-
-        // username veya password alanını
-        // input'un name değerine göre güncelle.
-        [event.target.name]:
-          event.target.value,
-      })
-    );
+      [event.target.name]:
+        event.target.value,
+    }));
   };
 
 
   return (
-
     <main className="login-page">
 
-      {/* Login formu */}
+      <div className="login-decoration decoration-one" />
+
+      <div className="login-decoration decoration-two" />
+
+
       <form
         className="login-card"
         onSubmit={login}
       >
 
-        <div className="login-brand">
-          B
+        <div className="login-header">
+
+          <div className="login-brand">
+            A
+          </div>
+
+          <div>
+
+            <div className="login-bank-name">
+              Ayşe Bank
+            </div>
+
+            <div className="login-bank-subtitle">
+              Kurumsal Bankacılık
+            </div>
+
+          </div>
+
         </div>
 
 
-        <p className="eyebrow blue">
-          BANKA MEKTUP YÖNETİMİ
-        </p>
+        <div className="login-title-area">
+
+          <p className="eyebrow blue">
+            MEKTUP YÖNETİMİ
+          </p>
+
+          <h1>
+            Hoş geldiniz
+          </h1>
+
+          <p className="login-description">
+            Ayşe Bank Mektup Yönetim
+            Sistemi'ne erişmek için
+            kullanıcı bilgilerinizle
+            giriş yapın.
+          </p>
+
+        </div>
 
 
-        <h1>
-          Giriş yapın
-        </h1>
+        <label className="login-field">
 
+          <span>
+            Kullanıcı adı
+          </span>
 
-        <p className="login-description">
-          Rolünüze uygun işlem
-          ekranına erişmek için
-          kullanıcı bilgilerinizle
-          giriş yapın.
-        </p>
+          <div className="login-input-wrap">
 
+            <span className="input-icon">
+              ◉
+            </span>
 
-        {/* Kullanıcı adı */}
-        <label>
+            <input
+              name="username"
+              value={
+                loginData.username
+              }
+              onChange={
+                updateLogin
+              }
+              autoComplete="username"
+              placeholder="Kullanıcı adınız"
+              required
+              disabled={isLoggingIn}
+            />
 
-          Kullanıcı adı
-
-          <input
-            name="username"
-
-            value={
-              loginData.username
-            }
-
-            onChange={
-              updateLogin
-            }
-
-            autoComplete="username"
-
-            placeholder="Kullanıcı adınız"
-
-            required
-          />
-
-        </label>
-
-
-        {/* Parola */}
-        <label>
-
-          Parola
-
-          <input
-            name="password"
-
-            type="password"
-
-            value={
-              loginData.password
-            }
-
-            onChange={
-              updateLogin
-            }
-
-            autoComplete="current-password"
-
-            placeholder="Parolanız"
-
-            required
-          />
+          </div>
 
         </label>
 
 
-        {/* Login hatası varsa göster */}
+        <label className="login-field">
+
+          <span>
+            Parola
+          </span>
+
+          <div className="login-input-wrap">
+
+            <span className="input-icon">
+              ●
+            </span>
+
+            <input
+              name="password"
+              type="password"
+              value={
+                loginData.password
+              }
+              onChange={
+                updateLogin
+              }
+              autoComplete="current-password"
+              placeholder="Parolanız"
+              required
+              disabled={isLoggingIn}
+            />
+
+          </div>
+
+        </label>
+
+
         {loginError && (
 
           <p className="login-error">
+
+            <span>
+              !
+            </span>
+
             {loginError}
+
           </p>
+
         )}
 
 
-        {/* Login butonu */}
         <button
           className="button primary login-button"
           type="submit"
+          disabled={isLoggingIn}
         >
 
-          Giriş yap
+          {isLoggingIn
+            ? 'Giriş yapılıyor…'
+            : 'Giriş yap'}
 
-          <span>
-            →
-          </span>
+          {!isLoggingIn && (
+            <span>
+              →
+            </span>
+          )}
 
         </button>
 
 
-        <p className="login-security">
-          🔒 Güvenli oturum
-          doğrulaması
-        </p>
+        <div className="login-security">
+
+          <span>
+            🔒
+          </span>
+
+          Güvenli oturum doğrulaması
+
+        </div>
+
+
+        <div className="login-footer">
+          Ayşe Bank · Kurumsal Sistem
+        </div>
 
       </form>
 
@@ -2988,22 +2720,11 @@ function LoginScreen({
 
 
 // ============================================================
-// REACT UYGULAMASINI HTML'E BAĞLAMA
+// REACT'I HTML'E BAĞLA
 // ============================================================
 
-// HTML'deki:
-//
-// <div id="root"></div>
-//
-// elementini buluyoruz.
 createRoot(
-  document.getElementById(
-    'root'
-  )
-)
-
-// React uygulamasını bu root elementinin
-// içine render ediyoruz.
-.render(
+  document.getElementById('root')
+).render(
   <App />
 );
