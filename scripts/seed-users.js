@@ -22,7 +22,7 @@ const hashPassword = (password) => {
 const users = [
   { username: 'sube.kullanici', password: 'Sube123!', fullName: 'Ayşe Şube Kullanıcısı', role: 'BRANCH' },
   { username: 'yetkili', password: 'Yetkili123!', fullName: 'Mehmet Yetkili', role: 'AUTHORIZED' },
-  { username: 'yonetici', password: 'Yonetici123!', fullName: 'Deniz Yönetici', role: 'ADMIN' }
+  { username: 'yonetici', password: '*Yonetici123*', fullName: 'Deniz Yönetici', role: 'ADMIN' }
 ];
 
 try {
