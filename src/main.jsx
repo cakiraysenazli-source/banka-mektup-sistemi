@@ -33,6 +33,10 @@ const emptyForm = {
   projectNo: '',
   address: '',
   notes: '',
+
+  // Komisyon oranı yüzde olarak tutuluyor.
+  // Örneğin 2 = %2 komisyon.
+  commissionRate: '2',
 };
 
 
@@ -137,6 +141,42 @@ const maksimumTutariKontrolEt = (
     return `Mektup tutarı ${MAX_AMOUNT_LIMIT.toLocaleString(
       'tr-TR'
     )} ${currency} limitini aşamaz.`;
+  }
+
+  return '';
+};
+
+// ============================================================
+// KOMİSYON ORANI KONTROLÜ
+// ============================================================
+
+// Komisyon oranı yüzde olarak giriliyor.
+// Örneğin 2 = %2.
+//
+// Komisyon oranının:
+// - boş olmamasını
+// - sayı olmasını
+// - 0'dan küçük olmamasını
+// - %100'den büyük olmamasını
+// kontrol ediyoruz.
+
+const komisyonOraniKontrolEt = (commissionRate) => {
+  if (
+    commissionRate === '' ||
+    commissionRate === null ||
+    commissionRate === undefined
+  ) {
+    return 'Komisyon oranı zorunludur.';
+  }
+
+  const rate = Number(commissionRate);
+
+  if (!Number.isFinite(rate)) {
+    return 'Geçerli bir komisyon oranı girin.';
+  }
+
+  if (rate < 0 || rate > 100) {
+    return 'Komisyon oranı %0 ile %100 arasında olmalıdır.';
   }
 
   return '';
@@ -358,6 +398,27 @@ function App() {
 
 
   // ==========================================================
+  // KOMİSYON HESAPLAMA
+  // ==========================================================
+
+  // Kullanıcının girdiği komisyon oranı yüzde olarak tutuluyor.
+  // Örneğin:
+  // amount = 100000
+  // commissionRate = 2
+  //
+  // Hesap:
+  // 100000 × (2 / 100) = 2000
+  //
+  // Sonuç: 2.000 TRY
+
+  const commissionAmount =
+    form.amount !== '' && form.commissionRate !== ''
+      ? Number(form.amount) *
+        (Number(form.commissionRate) / 100)
+      : 0;
+      
+      
+  // ==========================================================
   // API REQUEST HELPER
   // ==========================================================
 
@@ -522,6 +583,11 @@ function App() {
         form.authorityEmail
       );
 
+    const commissionError =
+      komisyonOraniKontrolEt(
+        form.commissionRate
+      );
+
     const amountError =
       maksimumTutariKontrolEt(
         form.amount,
@@ -549,6 +615,11 @@ function App() {
     if (termError) {
       nextErrors.expiryDate =
         termError;
+    }
+
+    if (commissionError) {
+      nextErrors.commissionRate =
+        commissionError;
     }
 
     setErrors(nextErrors);
@@ -581,6 +652,11 @@ function App() {
         form.currency
       );
 
+    const commissionError =
+      komisyonOraniKontrolEt(
+        form.commissionRate
+      );
+
     if (dateError) {
       nextErrors.expiryDate =
         dateError;
@@ -594,6 +670,11 @@ function App() {
     if (amountError) {
       nextErrors.amount =
         amountError;
+    }
+
+    if (commissionError) {
+      nextErrors.commissionRate =
+        commissionError;
     }
 
     setErrors(nextErrors);
@@ -897,6 +978,20 @@ function App() {
 
       notes:
         letter.notes || '',
+
+      // Backend'den gelen komisyon oranını tekrar forma getiriyoruz.
+      // Backend yüzdeyi 0.02 olarak tutuyorsa frontend'de
+      // 2 olarak göstermek gerekir.
+      //
+      // Örneğin:
+      // DB: 0.02
+      // Form: 2 (%2)
+
+      commissionRate:
+        letter.commissionRate !== null &&
+        letter.commissionRate !== undefined
+          ? String(letter.commissionRate)
+          : '2',
     });
 
     setEditingDraftId(
@@ -1752,92 +1847,155 @@ function App() {
               </FormSection>
 
 
-              {/* TUTAR */}
+              {/* ==========================================================
+                  TUTAR
+                ========================================================== */}
 
-              <FormSection
-                title="Tutar ve geçerlilik"
-                subtitle="Mektubun parasal ve tarih bilgileri"
-              >
-
-                <Field
-                  label="Mektup tutarı"
-                  name="amount"
-                  value={form.amount}
-                  onChange={update}
-                  error={errors.amount}
-                  required
-                  type="number"
-                  min="0"
-                  placeholder="Örn. 15000000"
-                  inputClassName={
-                    amountOverLimit
-                      ? 'input-danger'
-                      : ''
-                  }
-                />
-
-
-                <Field
-                  label="Para birimi"
-                  name="currency"
-                  value={form.currency}
-                  onChange={update}
-                  error={errors.currency}
+                <FormSection
+                  title="Tutar ve geçerlilik"
+                  subtitle="Mektubun parasal ve tarih bilgileri"
                 >
 
-                  <select
-                    name="currency"
-                    value={form.currency}
-                    onChange={update}
-                  >
+              {/* ========================================================
+                MEKTUP TUTARI
+                ======================================================== */}
 
-                    <option>
-                      TRY
-                    </option>
-
-                    <option>
-                      USD
-                    </option>
-
-                    <option>
-                      EUR
-                    </option>
-
-                    <option>
-                      GBP
-                    </option>
-
-                  </select>
-
-                </Field>
+              <Field
+                label="Mektup tutarı"
+                name="amount"
+                value={form.amount}
+                onChange={update}
+                error={errors.amount}
+                required
+                type="number"
+                min="0"
+                placeholder="Örn. 15000000"
+                inputClassName={
+                  amountOverLimit
+                ? 'input-danger'
+                : ''
+              }
+            />
 
 
-                <Field
-                  label="Düzenleme tarihi"
-                  name="issueDate"
-                  value={form.issueDate}
-                  onChange={update}
-                  error={errors.issueDate}
-                  required
-                  type="date"
-                  max={today}
-                />
+            {/* ========================================================
+                PARA BİRİMİ
+                ======================================================== */}
+
+              <Field
+                label="Para birimi"
+                name="currency"
+                value={form.currency}
+                onChange={update}
+                error={errors.currency}
+              >
+
+    <select
+      name="currency"
+      value={form.currency}
+      onChange={update}
+    >
+
+      <option value="TRY">
+        TRY
+      </option>
+
+      <option value="USD">
+        USD
+      </option>
+
+      <option value="EUR">
+        EUR
+      </option>
+
+      <option value="GBP">
+        GBP
+      </option>
+
+    </select>
+
+  </Field>
 
 
-                <Field
-                  label="Geçerlilik tarihi"
-                  name="expiryDate"
-                  value={form.expiryDate}
-                  onChange={update}
-                  error={errors.expiryDate}
-                  type="date"
-                  min={
-                    form.issueDate ||
-                    today
-                  }
-                />
+  {/* ========================================================
+      KOMİSYON ORANI
+      ======================================================== */}
 
-              </FormSection>
+  <Field
+    label="Komisyon oranı (%)"
+    name="commissionRate"
+    value={form.commissionRate}
+    onChange={update}
+    error={errors.commissionRate}
+    required
+    type="number"
+    min="0"
+    max="100"
+    step="0.01"
+    placeholder="Örn. 2"
+  />
+
+
+  {/* ========================================================
+      HESAPLANAN KOMİSYON
+      ======================================================== */}
+
+  <div className="commission-result">
+
+    <span>
+      Hesaplanan komisyon
+    </span>
+
+    <strong>
+      {commissionAmount.toLocaleString(
+        'tr-TR',
+        {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }
+      )}{' '}
+
+      {form.currency}
+
+    </strong>
+
+  </div>
+
+
+  {/* ========================================================
+      DÜZENLEME TARİHİ
+      ======================================================== */}
+
+  <Field
+    label="Düzenleme tarihi"
+    name="issueDate"
+    value={form.issueDate}
+    onChange={update}
+    error={errors.issueDate}
+    required
+    type="date"
+    max={today}
+  />
+
+
+  {/* ========================================================
+      GEÇERLİLİK TARİHİ
+      ======================================================== */}
+
+  <Field
+    label="Geçerlilik tarihi"
+    name="expiryDate"
+    value={form.expiryDate}
+    onChange={update}
+    error={errors.expiryDate}
+    type="date"
+    min={
+      form.issueDate ||
+      today
+    }
+  />
+
+</FormSection>
 
 
               {/* YETKİLİ */}

@@ -1,13 +1,48 @@
 <!doctype html>
+<!-- HTML5 kullandığımızı belirtir. -->
+
 <html lang="tr">
+  <!-- Sayfanın dilinin Türkçe olduğunu belirtir. -->
+
   <head>
+    <!-- Kullanıcıya doğrudan görünmeyen sayfa ayarları burada bulunur. -->
+
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#123b65" />
+    <!-- Türkçe karakterlerin (ç, ğ, ı, ö, ş, ü) düzgün görüntülenmesini sağlar. -->
+
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <!-- Sayfanın telefon, tablet ve bilgisayar gibi farklı ekran
+         boyutlarına uyum sağlamasını sağlar. -->
+
+    <meta
+      name="theme-color"
+      content="#123b65"
+    />
+    <!-- Mobil tarayıcılarda tarayıcı arayüzünün tema rengini belirler. -->
+
     <title>Mektup Giriş İşlemleri</title>
+    <!-- Tarayıcı sekmesinde görünen sayfa başlığını belirler. -->
+
   </head>
+
   <body>
+    <!-- Kullanıcıya gösterilecek sayfanın gövdesi burada bulunur. -->
+
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <!-- React uygulamasının yerleştirileceği ana HTML elementi.
+         main.jsx içerisindeki createRoot() bu elementi bulur
+         ve React uygulamasını bunun içine yerleştirir. -->
+
+    <script
+      type="module"
+      src="/src/main.jsx"
+    ></script>
+    <!-- React uygulamasının ana JavaScript dosyasını yükler.
+         main.jsx çalıştırıldığında <App /> bu sayfadaki
+         root elementinin içine yerleştirilir. -->
+
   </body>
 </html>

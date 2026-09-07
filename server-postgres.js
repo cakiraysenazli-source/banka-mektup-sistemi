@@ -222,6 +222,17 @@ const mapLetter = (letter) => ({
   address: letter.address,
   notes: letter.notes,
   status: letter.status,
+  commissionRate:
+    letter.komisyon_orani !== null &&
+    letter.komisyon_orani !== undefined
+      ? Number(letter.komisyon_orani) * 100
+      : null,
+
+  commissionAmount:
+    letter.komisyon_miktari !== null &&
+    letter.komisyon_miktari !== undefined
+      ? Number(letter.komisyon_miktari)
+      : '',
 
   approvedBy:
     letter.approved_by_name || '',
@@ -280,7 +291,10 @@ const listLetters = async (user) => {
 
       creator.full_name AS created_by_name,
       approver.full_name AS approved_by_name,
-      rejector.full_name AS rejected_by_name
+      rejector.full_name AS rejected_by_name,
+
+      komisyon.komisyon_orani,
+      letters.amount * komisyon.komisyon_orani AS komisyon_miktari
 
     FROM letters
 
@@ -292,6 +306,9 @@ const listLetters = async (user) => {
 
     LEFT JOIN users AS rejector
       ON rejector.id = letters.rejected_by
+
+    LEFT JOIN komisyon
+      ON komisyon.letter_id = letters.id
 
     ${
       branchOnly
@@ -555,16 +572,67 @@ const server = createServer(
             ]
           );
 
-        return sendJson(
-          response,
-          201,
-          mapLetter({
-            ...saved.rows[0],
-            created_by_name:
-              user.fullName,
-          })
-        );
-      }
+          const savedLetter = saved.rows[0];
+
+          const commissionRate = Number(letter.commissionRate)/100;
+
+          if (commissionRate >= 0 && Number.isFinite(commissionRate)) {
+            await pool.query(
+              `
+              INSERT INTO komisyon (
+                id,
+                letter_id,
+                komisyon_orani
+              )
+              VALUES (
+                $1, $2, $3
+              )
+            `,
+              [
+                randomUUID(),
+                savedLetter.id,
+                commissionRate,
+              ]
+            );
+          }
+
+       // Mektup ve komisyon kaydı oluşturulduktan sonra,
+      // frontend'e komisyon bilgileriyle birlikte dönmek için
+      // mektubu tekrar veritabanından çekiyoruz.
+      const savedWithCommission = await pool.query(
+      `
+        SELECT
+          letters.*,
+
+          $1 AS created_by_name,
+
+          komisyon.komisyon_orani,
+
+          letters.amount *
+            komisyon.komisyon_orani
+            AS komisyon_miktari
+
+          FROM letters
+
+          LEFT JOIN komisyon
+            ON komisyon.letter_id = letters.id
+
+          WHERE letters.id = $2
+        `,
+        [
+          user.fullName,
+          savedLetter.id,
+        ]
+      );
+
+      return sendJson(
+        response,
+        201,
+        mapLetter(
+          savedWithCommission.rows[0]
+        )
+      );
+        }
 
       /*
        * =========================

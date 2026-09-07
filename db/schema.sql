@@ -9,6 +9,7 @@
 -- letters tablosu ise mektup bilgilerini ve durumlarını tutar.
 -- Ayrıca mektupların hangi kullanıcı tarafından oluşturulduğunu
 -- users tablosuna bağlar ve sorguları hızlandırmak için indexler oluşturur.
+-- Kısaca verilerin tutulacağı yapıyı tanımlar.
 
 
 CREATE TABLE IF NOT EXISTS users (
