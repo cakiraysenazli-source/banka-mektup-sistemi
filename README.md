@@ -50,7 +50,7 @@ Kayıtlar PostgreSQL'deki `letters` tablosuna yazılır. Kullanıcılar ve rolle
 | --- | --- | --- |
 | `sube.kullanici` | `Sube123!` | Şube kullanıcısı |
 | `yetkili` | `Yetkili123!` | Yetkili |
-| `yonetici` | `Yonetici123!` | Yönetici |
+| `yonetici` | `*Yonetici123*` | Yönetici |
 
 Bu parolalar yalnızca yerel eğitim ortamı içindir; gerçek kullanımda değiştirilmelidir.
 
